@@ -1,0 +1,9 @@
+services:
+  flask:
+    build: .
+    container_name: flask-ai-server
+    ports:
+      - "5050:5050"
+    env_file:
+      - .env
+    restart: unless-stopped
