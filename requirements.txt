@@ -1,0 +1,3 @@
+flask
+flasgger==0.9.7.1
+python-dotenv

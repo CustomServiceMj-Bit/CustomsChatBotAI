@@ -1,0 +1,12 @@
+__pycache__/
+*.py[cod]
+venv/
+.env
+.env.*
+*.log
+.ipynb_checkpoints/
+
+# 모델 가중치 관련 파일은 깃에 푸쉬 x
+models/*.pt
+models/*.pth
+models/*.ckpt
