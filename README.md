@@ -7,7 +7,7 @@
 ### ✅ 사전 조건
 - [Docker](https://www.docker.com/) 설치
 - [Docker Compose](https://docs.docker.com/compose/install/) 설치
-- `.env` 파일에 필요한 환경 변수 설정 (옵션)
+- `.env` 파일에 필요한 환경 변수 설정 (이후 rds 도입이나, api 키 발급 시 필요)
 
 ### 🚀 실행 방법
 
@@ -15,7 +15,7 @@
 docker compose up -d
 ```
 
-→ 테스트: 실행 후 브라우저에서 [http://localhost:5050/apidocs](http://localhost:5050/apidocs) 접속
+→ **테스트**: 실행 후 브라우저에서 [http://localhost:5050/apidocs](http://localhost:5050/apidocs) 접속
 
 ### 🛑 종료 방법
 

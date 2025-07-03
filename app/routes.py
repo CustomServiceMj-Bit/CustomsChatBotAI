@@ -1,4 +1,5 @@
 from flask import Blueprint, request, jsonify
+from app.dto.request import Request
 from flasgger import swag_from
 from .service import run_model
 
@@ -40,6 +41,6 @@ api_blueprint = Blueprint("api", __name__)
     }
 })
 def predict():
-    question = request.json.get("question")
-    answer = run_model(question=question)
-    return jsonify({"answer": answer})
+    request_data = Request(**request.get_json())
+    answer = run_model(question=request_data.message)
+    return jsonify(answer.model_dump())
