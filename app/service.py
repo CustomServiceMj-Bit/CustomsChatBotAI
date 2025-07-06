@@ -1,6 +1,5 @@
 from app.dto.response import Response
-from models.track_delivery.dto.request import TrackDeliveryRequest
-from app.dependencies import track_delivery_handler
+from core.graphs.runner import run_customs_agent
 
 def run_model(question: str) -> "Response":
     """
@@ -9,16 +8,8 @@ def run_model(question: str) -> "Response":
         ex : "안녕, 너는 뭘 할 수 있어?"
         예시 코드는 아래와 같습니다.
     """
-    # match domain:
-    #     case "track_delivery":
-    #         request = TrackDeliveryRequest(message=question)
-    #         return track_delivery_handler.ask_to_gpt(request)
-    #     case "관세예측":
-    #         return
-    #     case "통관 및 수입 문제 관련 답변":
-    #         return
-    #     case _:
-    #         return
-
-    request = TrackDeliveryRequest(message=question)
-    return track_delivery_handler.ask_to_gpt(request)
+    reply = run_customs_agent(question)
+    return Response(
+        reply=reply,
+        success=True
+    )

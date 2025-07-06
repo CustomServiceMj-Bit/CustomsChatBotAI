@@ -1,7 +1,9 @@
 from typing import List, Optional
 from pydantic import BaseModel
-from models.track_delivery.dto.progress_detail import ProgressDetail
-from models.track_delivery.dto.cargo_progress_result import CargoProgressResult
+
+from core.customs_tracking.dto.cargo_progress_result import CargoProgressResult
+from core.customs_tracking.dto.progress_detail import ProgressDetail
+
 
 class Response(BaseModel):
     reply: Optional[str] = None
