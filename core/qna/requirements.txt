@@ -1,7 +1,0 @@
-torch
-transformers
-chromadb
-pandas
-numpy
-openai
-python-dotenv
