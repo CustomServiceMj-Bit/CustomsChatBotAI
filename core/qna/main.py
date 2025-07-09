@@ -74,10 +74,6 @@ def main():
         top_k=args.top_k, 
         show_details=args.show_details
     )
-    
-    print("\n=== 최종 답변 ===")
     print(answer)
-
-
-if __name__ == "__main__":
-    main()
+""" 최종 반환 답변 타입은 단순한 텍스트입니다. """
+""" String 타입으로, 생성된 답변만 출력합니다."""
