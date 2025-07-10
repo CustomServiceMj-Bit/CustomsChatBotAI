@@ -16,5 +16,5 @@ ENV PYTHONUNBUFFERED=1
 # 포트번호 명시
 EXPOSE 5050
 
-# Flask 앱 실행 (개발용 기준)
-CMD ["python", "run.py"]
+# Flask 앱 실행
+CMD ["gunicorn", "-b", "0.0.0.0:5050", "run:app"]
