@@ -11,7 +11,7 @@ RUN pip install --no-cache-dir -r requirements.txt
 COPY . .
 
 # 환경변수 설정
-ENV PYTHONPATH="${PYTHONPATH}:/app"
+#ENV PYTHONPATH="/app"
 ENV PYTHONUNBUFFERED=1
 
 # 포트번호 명시
