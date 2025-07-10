@@ -1,16 +1,32 @@
+# === Web Server ===
+gunicorn
 flask==2.3.3
+
+# === API Docs ===
 flasgger==0.9.7.1
+
+# === Environment Variables ===
 python-dotenv==1.0.1
+
+# === HTTP Requests ===
 requests==2.32.4
+
+# === Validation ===
 pydantic==2.7.1
+
+# === LangChain & Graph ===
 langgraph>=0.0.20
 langchain>=0.1.16
 langchain-core>=0.1.36
 langchain-openai>=0.1.6
+
+# === Vector DB ===
 faiss-cpu>=1.7.4
+chromadb>=0.4.24,<0.5.0
+
+# === ML/DL & Utilities ===
 numpy>=1.24.0,<2.2.0
 pandas>=1.5.3
 openai>=1.14.2
-torch>=2.0.0,<2.3.0       
+torch>=2.0.0,<2.3.0
 transformers>=4.38.0,<4.41.0
-chromadb>=0.4.24,<0.5.0
