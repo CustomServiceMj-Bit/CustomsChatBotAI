@@ -28,5 +28,5 @@ jobs:
             --instance-ids "$EC2_INSTANCE_ID" \
             --region "$AWS_REGION" \
             --comment "Deploying via SSM" \
-            --parameters 'commands=["cd ~/CustomsChatBotAI", "git pull", "docker compose down && docker compose up -d --build", "if [ $(docker inspect -f \"{{.State.Running}}\" flask-ai-server) = true ]; then docker image prune -af; fi"]' \
+            --parameters 'commands=["cd /home/ubuntu/CustomsChatBotAI", "git pull", "docker compose down && docker compose up -d --build", "if [ $(docker inspect -f \"{{.State.Running}}\" flask-ai-server) = true ]; then docker image prune -af; fi"]' \
             --output text
