@@ -4,7 +4,7 @@ Text encoding utilities using KoSimCSE-roberta model
 import torch
 import numpy as np
 from transformers import AutoTokenizer, AutoModel
-from config import MODEL_NAME, DEVICE
+from core.qna.config import MODEL_NAME, DEVICE
 
 
 class TextEncoder:
