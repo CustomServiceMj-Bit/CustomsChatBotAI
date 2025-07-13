@@ -22,3 +22,17 @@ docker compose up -d
 ```bash
 docker compose down
 ```
+
+## 📊 데이터베이스 설정
+
+### VectorDB 사용
+이 프로젝트는 기존 VectorDB의 pickle 파일들을 직접 사용합니다:
+- `core/qna/VectorDB/q_data.pkl`: 질문 임베딩 데이터
+- `core/qna/VectorDB/s_data.pkl`: 답변 스니펫 임베딩 데이터  
+- `core/qna/VectorDB/k_data.pkl`: 키워드 임베딩 데이터
+
+**장점**:
+- ChromaDB 없이도 동작
+- 빠른 로딩 속도
+- Git 저장소 크기 최적화
+- 간단한 구조

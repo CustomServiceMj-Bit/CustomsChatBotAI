@@ -70,7 +70,6 @@ def qna_agent(state: CustomsAgentState) -> CustomsAgentState:
     
     # 1. RAG 시스템을 사용한 응답 생성 (1차 우선)
     rag_system = RAGSystem()
-    rag_system.setup_database()
     rag_response = rag_system.search_and_generate(
         query=query,
         top_k=5,

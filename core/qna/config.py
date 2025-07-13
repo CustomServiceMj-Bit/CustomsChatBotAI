@@ -12,15 +12,7 @@ PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.dirname(CURRENT_DIR)))
 MODEL_NAME = 'BM-K/KoSimCSE-roberta'
 DEVICE = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 
-# ChromaDB configurations - ���� ��� ��� �� �ڷ���Ʈ�� ��Ȱ��ȭ
-CHROMA_DB_PATH = os.path.join(CURRENT_DIR, "chroma_db")
-COLLECTION_NAMES = {
-    "question": "q_embeddings",
-    "snippet": "s_embeddings", 
-    "keyword": "k_embeddings"
-}
-
-# Data file paths - ���� ��� ���
+# VectorDB data file paths
 DATA_FILES = {
     "question": os.path.join(CURRENT_DIR, "VectorDB", "q_data.pkl"),
     "snippet": os.path.join(CURRENT_DIR, "VectorDB", "s_data.pkl"),
