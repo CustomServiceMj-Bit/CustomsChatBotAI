@@ -4,7 +4,7 @@ Answer generation using OpenAI GPT models
 import os
 from openai import OpenAI
 from dotenv import load_dotenv
-from config import OPENAI_MODEL, GENERATION_TEMPERATURE, MAX_REFERENCE_DOCS
+from core.qna.config import OPENAI_MODEL, GENERATION_TEMPERATURE, MAX_REFERENCE_DOCS
 
 load_dotenv()
 

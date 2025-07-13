@@ -2,9 +2,9 @@ import os
 os.environ["TOKENIZERS_PARALLELISM"] = "false"
 
 import argparse
-from retriever import RAGRetriever
-from generator import AnswerGenerator
-from database import ChromaDBManager
+from core.qna.retriever import RAGRetriever
+from core.qna.generator import AnswerGenerator
+from core.qna.database import ChromaDBManager
 
 
 class RAGSystem:

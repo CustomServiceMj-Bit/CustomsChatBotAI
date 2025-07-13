@@ -2,9 +2,9 @@
 RAG retrieval system with weighted search across multiple collections
 """
 import torch
-from encoder import TextEncoder, cosine_score
-from database import ChromaDBManager
-from config import DEFAULT_TOP_K, DEFAULT_WEIGHTS
+from core.qna.encoder import TextEncoder, cosine_score
+from core.qna.database import ChromaDBManager
+from core.qna.config import DEFAULT_TOP_K, DEFAULT_WEIGHTS
 
 
 class RAGRetriever:
