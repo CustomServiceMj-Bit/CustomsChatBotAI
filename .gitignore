@@ -15,8 +15,3 @@ models/*.ckpt
 .idea/
 *.iml
 
-# ChromaDB database files
-core/qna/chroma_db/
-*.sqlite3
-*.bin
-*.pickle
