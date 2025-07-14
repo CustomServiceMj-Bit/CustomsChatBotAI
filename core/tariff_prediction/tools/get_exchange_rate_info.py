@@ -3,8 +3,9 @@ from datetime import datetime
 import pandas as pd
 import re
 from langchain_core.tools import tool
-from core.shared.utils.llm import get_llm
 import os
+
+from core.tariff_prediction.constants.api_config import KOREAEXIM_API_URL, KOREAEXIM_API_KEY
 
 # 환율 지원 국가 목록
 SUPPORTED_COUNTRIES = {
@@ -27,19 +28,18 @@ def get_currency_for_country(country: str) -> str:
     return SUPPORTED_COUNTRIES.get(country, 'USD')
 
 def get_exchange_rate_api(cur_unit: str, situation: str = '해외직구'):
-    """실제 한국수출입은행 API를 사용하여 환율을 조회합니다."""
-    url = 'https://oapi.koreaexim.go.kr/site/program/financial/exchangeJSON'
+    """한국수출입은행 API를 사용하여 환율을 조회합니다."""
+
     today_date = datetime.now().strftime('%Y%m%d')
-    api_key = os.getenv('KOREAEXIM_API_KEY', '')  # 환경변수에서 API 키 가져오기
     
     params = {
-        'authkey': api_key,  
+        'authkey': KOREAEXIM_API_KEY,
         'searchdate': today_date,
         'data': 'AP01'
     }
 
     try:
-        response = requests.get(url, params=params)
+        response = requests.get(KOREAEXIM_API_URL, params=params)
         response.raise_for_status()  
         data = pd.DataFrame(response.json())
 
