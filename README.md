@@ -7,7 +7,7 @@
 ### ✅ 사전 조건
 - [Docker](https://www.docker.com/) 설치
 - [Docker Compose](https://docs.docker.com/compose/install/) 설치
-- `.env` 파일에 필요한 환경 변수 설정 (이후 rds 도입이나, api 키 발급 시 필요)
+- `.env` 파일에 필요한 환경 변수 설정 (한국수출입은행, 유니패스, GPT api 경로 및 키 설정 필요)
 
 ### 🚀 실행 방법
 
