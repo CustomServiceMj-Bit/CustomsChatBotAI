@@ -10,8 +10,8 @@ venv/
 models/*.pt
 models/*.pth
 models/*.ckpt
+model
 
 # IDE 파일
 .idea/
 *.iml
-
