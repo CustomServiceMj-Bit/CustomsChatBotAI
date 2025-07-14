@@ -8,8 +8,10 @@ def run_model(question: str) -> "Response":
         ex : "안녕, 너는 뭘 할 수 있어?"
         예시 코드는 아래와 같습니다.
     """
-    reply = run_customs_agent(question)
+    state = run_customs_agent(question)
     return Response(
-        reply=reply,
+        reply=state.get("final_response"),
+        progress_details=state.get("progress_details"),
+        error_reason=state.get("error_reason"),
         success=True
     )
