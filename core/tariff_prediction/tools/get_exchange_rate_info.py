@@ -6,18 +6,7 @@ from langchain_core.tools import tool
 import os
 
 from core.tariff_prediction.constants.api_config import KOREAEXIM_API_URL, KOREAEXIM_API_KEY
-
-# 환율 지원 국가 목록
-SUPPORTED_COUNTRIES = {
-    '미국': 'USD', '일본': 'JPY', '유럽연합': 'EUR', '중국': 'CNY',
-    '독일': 'EUR', '프랑스': 'EUR', '이탈리아': 'EUR', '스페인': 'EUR',
-    '네덜란드': 'EUR', '벨기에': 'EUR', '오스트리아': 'EUR', '그리스': 'EUR',
-    '포르투갈': 'EUR', '아일랜드': 'EUR', '핀란드': 'EUR', '룩셈부르크': 'EUR',
-    '스웨덴': 'EUR', '덴마크': 'EUR', '폴란드': 'EUR', '체코': 'EUR',
-    '헝가리': 'EUR', '슬로바키아': 'EUR', '슬로베니아': 'EUR', '에스토니아': 'EUR',
-    '라트비아': 'EUR', '리투아니아': 'EUR', '몰타': 'EUR', '키프로스': 'EUR',
-    '크로아티아': 'EUR', '루마니아': 'EUR', '불가리아': 'EUR'
-}
+from core.tariff_prediction.constants import SUPPORTED_COUNTRIES
 
 def is_supported_country(country: str) -> bool:
     """지원되는 국가인지 확인합니다."""

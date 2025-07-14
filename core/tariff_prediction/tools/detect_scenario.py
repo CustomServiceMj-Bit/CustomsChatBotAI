@@ -1,6 +1,7 @@
 from langchain_core.tools import tool
 from langchain_core.messages import HumanMessage
 from core.shared.utils.llm import get_llm
+from core.tariff_prediction.constants import VALID_SCENARIOS
 
 @tool
 def detect_scenario_from_input(user_input: str) -> str | None:
@@ -27,21 +28,20 @@ def detect_scenario_from_input(user_input: str) -> str | None:
         result = result.strip()
         
         # 응답에서 시나리오 추출 (따옴표나 "답변:" 등의 접두사 제거)
-        valid_scenarios = ['해외직구', '해외체류 중 구매', '해외배송']
         
         # 직접 매칭 시도
-        if result in valid_scenarios:
+        if result in VALID_SCENARIOS:
             return result
             
         # 응답에서 시나리오 추출 시도
-        for scenario in valid_scenarios:
+        for scenario in VALID_SCENARIOS:
             if scenario in result:
                 return scenario
                 
         # "답변:" 접두사 제거 후 시도
         if result.startswith('답변:'):
             clean_result = result.replace('답변:', '').strip().strip('"').strip("'")
-            if clean_result in valid_scenarios:
+            if clean_result in VALID_SCENARIOS:
                 return clean_result
                 
         return None
