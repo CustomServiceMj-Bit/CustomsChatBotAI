@@ -7,6 +7,7 @@ from core.qna.agent.qna_agent import qna_agent
 from core.customs_tracking.agent.customs_tracking_agent import customs_tracking_agent
 from core.tariff_prediction.agent.tariff_prediction_agent import tariff_prediction_agent
 from core.shared.router.intent_router import  intent_router
+from core.graphs.final_agent import final_agent
 
 def create_customs_graph():
     """관세청 에이전트 그래프를 생성합니다."""
@@ -19,6 +20,7 @@ def create_customs_graph():
     workflow.add_node("customs_tracking", customs_tracking_agent)
     workflow.add_node("tariff_prediction", tariff_prediction_agent)
     workflow.add_node("qna", qna_agent)
+    workflow.add_node("final_agent", final_agent)
     
     # 시작점 설정
     workflow.set_entry_point("intent_router")
@@ -34,9 +36,11 @@ def create_customs_graph():
         }
     )
     
-    # 각 에이전트에서 종료점으로
-    workflow.add_edge("customs_tracking", END)
-    workflow.add_edge("tariff_prediction", END)
-    workflow.add_edge("qna", END)
+    # 각 에이전트에서 final_agent로
+    workflow.add_edge("customs_tracking", "final_agent")
+    workflow.add_edge("tariff_prediction", "final_agent")
+    workflow.add_edge("qna", "final_agent")
+    # final_agent에서 종료점으로
+    workflow.add_edge("final_agent", END)
     
     return workflow.compile()
