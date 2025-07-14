@@ -9,6 +9,7 @@ from core.tariff_prediction.tools.detect_scenario import detect_scenario_from_in
 from core.tariff_prediction.tools.parse_user_input import parse_user_input
 from core.tariff_prediction.tools.parse_hs_results import parse_hs6_result, generate_hs10_candidates
 from core.tariff_prediction.tools.parse_tariff_result import parse_tariff_result
+from core.tariff_prediction.constants import SUPPORTED_COUNTRIES, SCENARIOS, OFF_TOPIC_KEYWORDS, CORRECTION_KEYWORDS, SESSION_TERMINATION_KEYWORDS
 
 # 전역 워크플로우 매니저
 class WorkflowManager:
@@ -45,22 +46,9 @@ class TariffPredictionWorkflow:
         }
         
         # 환율 지원 국가 목록
-        self.supported_countries = {
-            '미국': 'USD', '일본': 'JPY', '유럽연합': 'EUR', '중국': 'CNY',
-            '독일': 'EUR', '프랑스': 'EUR', '이탈리아': 'EUR', '스페인': 'EUR',
-            '네덜란드': 'EUR', '벨기에': 'EUR', '오스트리아': 'EUR', '그리스': 'EUR',
-            '포르투갈': 'EUR', '아일랜드': 'EUR', '핀란드': 'EUR', '룩셈부르크': 'EUR',
-            '스웨덴': 'EUR', '덴마크': 'EUR', '폴란드': 'EUR', '체코': 'EUR',
-            '헝가리': 'EUR', '슬로바키아': 'EUR', '슬로베니아': 'EUR', '에스토니아': 'EUR',
-            '라트비아': 'EUR', '리투아니아': 'EUR', '몰타': 'EUR', '키프로스': 'EUR',
-            '크로아티아': 'EUR', '루마니아': 'EUR', '불가리아': 'EUR'
-        }
+        self.supported_countries = SUPPORTED_COUNTRIES
         
-        self.scenarios = {
-            '1': '해외직구',
-            '2': '해외체류 중 구매', 
-            '3': '해외배송'
-        }
+        self.scenarios = SCENARIOS
 
     def reset_session(self):
         """세션을 초기화합니다."""
@@ -95,7 +83,7 @@ class TariffPredictionWorkflow:
 
     def handle_correction_request(self, user_input: str) -> str:
         """수정 요청을 처리합니다."""
-        if any(word in user_input for word in ['수정', '잘못', '다시', '틀렸']):
+        if any(word in user_input for word in CORRECTION_KEYWORDS):
             if self.state['current_step'] == 'scenario_selection':
                 return "어떤 정보를 수정하시겠습니까?\n1. 시나리오\n2. 상품 정보\n3. 처음부터 다시 시작"
             elif self.state['current_step'] == 'input_collection':
@@ -109,20 +97,14 @@ class TariffPredictionWorkflow:
 
     def is_off_topic(self, user_input: str) -> bool:
         """관세 계산과 관련 없는 주제인지 확인합니다."""
-        off_topic_keywords = [
-            '날씨', '음식', '영화', '음악', '운동', '취미', '가족', '친구',
-            '일', '학교', '공부', '시험', '여행', '휴가', '주말', '주중',
-            '아침', '점심', '저녁', '잠', '병원', '약', '건강', '운동'
-        ]
-        
         input_lower = user_input.lower()
-        return any(keyword in input_lower for keyword in off_topic_keywords)
+        return any(keyword in input_lower for keyword in OFF_TOPIC_KEYWORDS)
 
     def process_user_input(self, user_input: str) -> str:
         """사용자 입력을 처리하고 적절한 응답을 반환합니다."""
         
         # 세션 중단 요청 확인
-        if any(word in user_input for word in ['중단', '그만', '취소', '종료']):
+        if any(word in user_input for word in SESSION_TERMINATION_KEYWORDS):
             self.reset_session()
             return "관세 계산을 중단하겠습니다. 다른 질문이 있으시면 언제든 말씀해 주세요."
 
