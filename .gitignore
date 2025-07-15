@@ -15,3 +15,4 @@ model
 # IDE 파일
 .idea/
 *.iml
+.DS_Store
