@@ -4,5 +4,4 @@ __pycache__/
 *.pyd
 venv/
 .env
-models/*.pt
 .ipynb_checkpoints/
