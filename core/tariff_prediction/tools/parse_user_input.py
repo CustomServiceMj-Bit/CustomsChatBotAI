@@ -1,57 +1,104 @@
 from typing import Dict, Any
 import re
 from langchain_core.tools import tool
-
+from core.shared.utils.llm import get_llm
+import json
 from core.tariff_prediction.constants import SUPPORTED_COUNTRIES, REMOVE_KEYWORDS, PRICE_PATTERNS, QUANTITY_PATTERNS
+
+def parse_user_input_rule(user_input: str) -> Dict[str, Any]:
+    parsed = {}
+    # 가격 정보 추출 (만원, 천원, 원, 달러, 엔, 위안 등)
+    price = None
+    for pattern in PRICE_PATTERNS:
+        match = re.search(pattern, user_input)
+        if match:
+            price_str = match.group(1).replace(',', '')
+            unit = match.group(2) if len(match.groups()) > 1 else ''
+            try:
+                price = float(price_str)
+                if '만' in unit:
+                    price *= 10000
+                elif '천' in unit:
+                    price *= 1000
+                parsed['price'] = price
+                break
+            except Exception:
+                continue
+    # 수량 정보 추출 (숫자+개, 한 개, 두 개 등)
+    quantity = None
+    for pattern in QUANTITY_PATTERNS + [r'([한두세네]) ?개']:
+        match = re.search(pattern, user_input)
+        if match:
+            try:
+                if match.group(1).isdigit():
+                    quantity = int(match.group(1))
+                else:
+                    h2n = {'한':1, '두':2, '세':3, '네':4}
+                    quantity = h2n.get(match.group(1), 1)
+                parsed['quantity'] = quantity
+                break
+            except Exception:
+                continue
+    # 국가 정보 추출 (미국에서, 일본에서 등 조사 포함)
+    country = None
+    for c in SUPPORTED_COUNTRIES.keys():
+        if c in user_input:
+            country = c
+            parsed['country'] = c
+            break
+        elif c + '에서' in user_input:
+            country = c
+            parsed['country'] = c
+            break
+    # 상품명/묘사 추출
+    cleaned = user_input
+    for pattern in PRICE_PATTERNS + QUANTITY_PATTERNS + [r'([한두세네]) ?개']:
+        cleaned = re.sub(pattern, '', cleaned)
+    if country:
+        cleaned = cleaned.replace(country, '')
+        cleaned = cleaned.replace(country + '에서', '')
+    for keyword in REMOVE_KEYWORDS + ['샀어요', '구매', '예측해줘', '관세', '예측', '해줘']:
+        cleaned = cleaned.replace(keyword, '')
+    cleaned = cleaned.strip()
+    if cleaned and len(cleaned) > 1:
+        parsed['product_name'] = cleaned
+    return parsed
 
 @tool
 def parse_user_input(user_input: str) -> Dict[str, Any]:
-    """자연어 입력을 파싱하여 상품 정보를 추출합니다."""
-    parsed = {}
-    
-    # 가격 정보 추출 (숫자 + 원/달러/엔/위안 등)
-    for pattern in PRICE_PATTERNS:
-        matches = re.findall(pattern, user_input)
-        if matches:
-            price_str = matches[0].replace(',', '')
-            if '만원' in user_input:
-                parsed['price'] = float(price_str) * 10000
-            elif '천원' in user_input:
-                parsed['price'] = float(price_str) * 1000
-            else:
-                parsed['price'] = float(price_str)
-            break
-    
-    # 수량 정보 추출
-    for pattern in QUANTITY_PATTERNS:
-        matches = re.findall(pattern, user_input)
-        if matches:
-            parsed['quantity'] = int(matches[0])
-            break
-    
-    # 국가 정보 추출
-    countries = list(SUPPORTED_COUNTRIES.keys())
-    for country in countries:
-        if country in user_input:
-            parsed['country'] = country
-            break
-    
-    # 상품 묘사 추출 (가격, 수량, 국가 정보를 제외한 나머지 부분)
-    # 먼저 가격, 수량, 국가 관련 키워드를 제거
-    cleaned_input = user_input
-    for pattern in PRICE_PATTERNS + QUANTITY_PATTERNS:
-        cleaned_input = re.sub(pattern, '', cleaned_input)
-    
-    for country in countries:
-        cleaned_input = cleaned_input.replace(country, '')
-    
-    # 일반적인 키워드 제거
-    for keyword in REMOVE_KEYWORDS:
-        cleaned_input = cleaned_input.replace(keyword, '')
-    
-    # 상품 묘사로 사용할 부분 추출
-    cleaned_input = cleaned_input.strip()
-    if cleaned_input and len(cleaned_input) > 2:  # 의미있는 길이인 경우만
-        parsed['product_name'] = cleaned_input
-    
-    return parsed 
+    """자연어 입력을 LLM으로 파싱하여 상품 정보를 추출합니다. 실패 시 rule 기반 파싱을 fallback으로 사용합니다."""
+    prompt = f"""
+아래는 관세 예측을 위한 사용자 입력입니다. 입력에서 다음 정보를 추출해 JSON으로 반환하세요.
+- product_name: 상품명 또는 상품 설명 (예: 노트북, 운동화, 블루투스 이어폰)
+- country: 구매 국가 (예: 미국, 일본, 독일 등)
+- price: 상품 가격(숫자만, 단위는 원)
+- quantity: 수량(숫자, 없으면 1)
+
+입력: "{user_input}"
+
+반환 예시:
+{{
+  "product_name": "노트북",
+  "country": "미국",
+  "price": 1500000,
+  "quantity": 1
+}}
+
+반드시 위와 같은 JSON만 반환하세요.
+"""
+    try:
+        llm = get_llm()
+        response = llm.invoke([{"role": "user", "content": prompt}])
+        json_str = response.content if hasattr(response, 'content') else str(response)
+        if not isinstance(json_str, str):
+            raise ValueError('LLM 응답이 문자열이 아님')
+        json_start = json_str.find('{')
+        json_end = json_str.rfind('}') + 1
+        parsed = json.loads(json_str[json_start:json_end])
+        # 값이 하나라도 있으면 반환
+        if parsed and (parsed.get('product_name') or parsed.get('country') or parsed.get('price')):
+            return parsed
+    except Exception:
+        pass
+    # 실패 시 rule 기반 파싱
+    return parse_user_input_rule(user_input) 

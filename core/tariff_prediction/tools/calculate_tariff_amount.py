@@ -130,6 +130,9 @@ def calculate_tariff_amount(product_code: str, value: float, origin_country: str
         if cur_unit is None:
             return f"환율 정보를 찾을 수 없습니다. 국가: {origin_country}"
         usd_rate = get_exchange_rate_api(cur_unit, situation)
+        # 환율이 None이면 더미값(1300.0)으로 대체
+        if usd_rate is None:
+            usd_rate = 1300.0
         
         # 관세 계산
         tax_info = calculate_tax_amount(value, item_count, shipping_cost, float(tariff_info['관세율']), usd_rate, situation)

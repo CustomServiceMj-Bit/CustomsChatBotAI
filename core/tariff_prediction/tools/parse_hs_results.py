@@ -13,31 +13,20 @@ def parse_hs6_result(hs6_result: str) -> List[Dict]:
     lines = hs6_result.strip().split('\n')
     for line in lines:
         if line.strip() and any(char.isdigit() for char in line):
-            # "1. 8471.30.00 (확률: 85%)" 형태 파싱
-            match = re.search(r'(\d+)\.\s*([0-9]{4}\.[0-9]{2}\.[0-9]{2})\s*\(확률:\s*(\d+)%\)', line)
+            # "1. 851770 (확률: 98.02%)" 형태 파싱
+            match = re.search(r'(\d+)\.\s*([0-9]{6})\s*\(확률:\s*([0-9.]+)%\)', line)
             if match:
                 rank = int(match.group(1))
                 code = match.group(2)
-                confidence = int(match.group(3)) / 100.0
-                
-                # HS6 코드로 변환 (첫 6자리)
-                hs6_code = '.'.join(code.split('.')[:2])
-                
+                confidence = float(match.group(3)) / 100.0
+                hs6_code = code[:4] + '.' + code[4:]
                 candidates.append({
                     'code': hs6_code,
                     'description': f'HS6 코드 {hs6_code}',
                     'confidence': confidence,
                     'full_code': code
                 })
-    
-    # 파싱 실패 시 더미 데이터 반환
-    if not candidates:
-        candidates = [
-            {'code': '8471.30', 'description': '노트북 컴퓨터', 'confidence': 0.95},
-            {'code': '8471.40', 'description': '데스크톱 컴퓨터', 'confidence': 0.85},
-            {'code': '8471.50', 'description': '서버 컴퓨터', 'confidence': 0.75}
-        ]
-    
+    print(f"[DEBUG] parse_hs6_result candidates: {candidates}")
     return candidates
 
 @tool
