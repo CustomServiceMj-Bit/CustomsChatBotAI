@@ -10,6 +10,9 @@ from core.tariff_prediction.tools.parse_user_input import parse_user_input
 from core.tariff_prediction.tools.parse_hs_results import parse_hs6_result, generate_hs10_candidates
 from core.tariff_prediction.tools.parse_tariff_result import parse_tariff_result
 from core.tariff_prediction.constants import SUPPORTED_COUNTRIES, SCENARIOS, OFF_TOPIC_KEYWORDS, CORRECTION_KEYWORDS, SESSION_TERMINATION_KEYWORDS
+from core.tariff_prediction.agent.step_api import tariff_prediction_step_api
+from core.tariff_prediction.dto.tariff_request import TariffPredictionRequest
+from core.tariff_prediction.dto.tariff_response import TariffPredictionResponse
 
 # 전역 워크플로우 매니저
 class WorkflowManager:
@@ -101,8 +104,9 @@ class TariffPredictionWorkflow:
         return any(keyword in input_lower for keyword in OFF_TOPIC_KEYWORDS)
 
     def process_user_input(self, user_input: str) -> str:
-        """사용자 입력을 처리하고 적절한 응답을 반환합니다."""
-        
+        """
+        사용자 입력을 처리하고 적절한 응답을 반환합니다.
+        """
         # 세션 중단 요청 확인
         if any(word in user_input for word in SESSION_TERMINATION_KEYWORDS):
             self.reset_session()
@@ -126,8 +130,8 @@ class TariffPredictionWorkflow:
             return self.handle_hs6_selection(user_input)
         elif self.state['current_step'] == 'hs10_selection':
             return self.handle_hs10_selection(user_input)
-        elif self.state['current_step'] == 'calculation':
-            return self.handle_calculation(user_input)
+        # elif self.state['current_step'] == 'calculation':
+        #     return self.handle_calculation(user_input)
 
         return "죄송합니다. 현재 상태를 인식할 수 없습니다. 처음부터 다시 시작하겠습니다."
 
@@ -157,9 +161,7 @@ class TariffPredictionWorkflow:
 번호를 입력하거나 상황을 설명해 주세요."""
 
     def handle_input_collection(self, user_input: str) -> str:
-        """자연어 입력 수집을 처리합니다."""
         parsed = self.parse_user_input(user_input)
-        
         # 필수 정보 확인
         missing_info = []
         if 'product_name' not in parsed:
@@ -168,30 +170,29 @@ class TariffPredictionWorkflow:
             missing_info.append("구매 국가")
         if 'price' not in parsed:
             missing_info.append("상품 가격")
-        
         if missing_info:
             missing_str = ", ".join(missing_info)
             return f"다음 정보가 누락되었습니다: {missing_str}\n\n💡 **상품 묘사의 정확도가 높을수록 정확한 관세 예측이 가능합니다!**\n\n예시:\n• \"아랫창은 고무로 되어있고 하얀색 운동화를 80000원에 독일에서 샀어요\"\n• \"인텔 i7 노트북을 150만원에 미국에서 구매했어요\"\n• \"블루투스 이어폰 2개를 12만원에 일본에서 샀어요\""
-        
-        # 국가 지원 여부 확인
-        if not self.is_supported_country(parsed['country']):
-            return f"죄송합니다. '{parsed['country']}'의 환율 정보는 현재 제공되지 않습니다. 지원되는 국가로 다시 입력해 주세요."
-        
-        # 상품 설명 정제
-        parsed['product_name'] = clean_product_description(parsed['product_name'])
-        
         # 상태 업데이트
         self.state.update(parsed)
+        # step_api.py 활용
+        req = TariffPredictionRequest(
+            step="input",
+            product_description=parsed['product_name'],
+            origin_country=parsed['country'],
+            price=parsed['price'],
+            quantity=parsed.get('quantity', 1),
+            shipping_cost=parsed.get('shipping_cost', 0),
+            scenario=self.state.get('scenario')
+        )
+        resp: TariffPredictionResponse = tariff_prediction_step_api(req)
+        if resp.message and (not resp.hs6_candidates):
+            return resp.message
+        self.state['hs6_candidates'] = resp.hs6_candidates
         self.state['current_step'] = 'hs6_selection'
-        
-        # HS6 예측
-        try:
-            hs6_result = get_hs_classification(parsed['product_name'])
-            self.state['hs6_candidates'] = self.parse_hs6_result(hs6_result)
-            
-            return f"상품묘사: {parsed['product_name']}\n국가: {parsed['country']}\n가격: {parsed['price']:,}원\n수량: {parsed.get('quantity', 1)}개\n\nHS6 코드 후보를 찾았습니다. 번호를 선택해 주세요:\n{self.format_hs6_candidates()}"
-        except Exception as e:
-            return f"HS 코드 예측 중 오류가 발생했습니다: {str(e)}"
+        return f"상품묘사: {parsed['product_name']}\n국가: {parsed['country']}\n가격: {parsed['price']:,}원\n수량: {parsed.get('quantity', 1)}개\n\nHS6 코드 후보를 찾았습니다. 번호를 선택해 주세요:\n" + '\n'.join([
+            f"{i+1}. {c['code']} - {c['description']} (신뢰도: {c['confidence']})" for i, c in enumerate(resp.hs6_candidates or [])
+        ])
 
     def parse_hs6_result(self, hs6_result: str) -> List[Dict]:
         """HS6 결과를 파싱합니다."""
@@ -205,23 +206,28 @@ class TariffPredictionWorkflow:
         return formatted
 
     def handle_hs6_selection(self, user_input: str) -> str:
-        """HS6 선택을 자연어로 처리합니다."""
-        # 숫자만 추출
         number_match = re.search(r'(\d+)', user_input)
-        if number_match:
+        if number_match and self.state.get('hs6_candidates'):
             selection = int(number_match.group(1))
-            if 1 <= selection <= len(self.state['hs6_candidates']):
-                selected = self.state['hs6_candidates'][selection - 1]
+            candidates = self.state['hs6_candidates']
+            if 1 <= selection <= len(candidates):
+                selected = candidates[selection - 1]
                 self.state['hs6_code'] = selected['code']
+                # step_api.py 활용
+                req = TariffPredictionRequest(
+                    step="hs6_select",
+                    hs6_code=selected['code']
+                )
+                resp: TariffPredictionResponse = tariff_prediction_step_api(req)
+                if resp.message and (not resp.hs10_candidates):
+                    return resp.message
+                self.state['hs10_candidates'] = resp.hs10_candidates
                 self.state['current_step'] = 'hs10_selection'
-                
-                # HS10 후보 생성
-                hs10_candidates = self.generate_hs10_candidates(selected['code'])
-                self.state['hs10_candidates'] = hs10_candidates
-                
-                return f"선택하신 HS6 코드: {selected['code']}\n\nHS10 코드 후보를 선택해 주세요:\n{self.format_hs10_candidates()}"
+                return f"선택하신 HS6 코드: {selected['code']}\n\nHS10 코드 후보를 선택해 주세요:\n" + '\n'.join([
+                    f"{i+1}. {c['code']} - {c['description']}" for i, c in enumerate(resp.hs10_candidates or [])
+                ])
             else:
-                return f"1부터 {len(self.state['hs6_candidates'])} 사이의 번호를 입력해 주세요."
+                return f"1부터 {len(candidates)} 사이의 번호를 입력해 주세요."
         else:
             return f"숫자를 입력해 주세요. (예: 1, 2, 3)"
 
@@ -237,19 +243,31 @@ class TariffPredictionWorkflow:
         return formatted
 
     def handle_hs10_selection(self, user_input: str) -> str:
-        """HS10 선택을 자연어로 처리합니다."""
-        # 숫자만 추출
         number_match = re.search(r'(\d+)', user_input)
-        if number_match:
+        if number_match and self.state.get('hs10_candidates'):
             selection = int(number_match.group(1))
-            if 1 <= selection <= len(self.state['hs10_candidates']):
-                selected = self.state['hs10_candidates'][selection - 1]
+            candidates = self.state['hs10_candidates']
+            if 1 <= selection <= len(candidates):
+                selected = candidates[selection - 1]
                 self.state['hs10_code'] = selected['code']
-                self.state['current_step'] = 'calculation'
-                
-                return self.perform_calculation()
+                # step_api.py 활용
+                req = TariffPredictionRequest(
+                    step="hs10_select",
+                    hs10_code=selected['code'],
+                    origin_country=self.state.get('country'),
+                    price=self.state.get('price'),
+                    quantity=self.state.get('quantity', 1),
+                    shipping_cost=self.state.get('shipping_cost', 0),
+                    scenario=self.state.get('scenario')
+                )
+                resp: TariffPredictionResponse = tariff_prediction_step_api(req)
+                self.reset_session()
+                if resp.calculation_result:
+                    return f"# 🎯 관세 계산 결과\n{resp.calculation_result}\n\n{resp.message or ''}"
+                else:
+                    return resp.message or "계산 결과를 가져오지 못했습니다."
             else:
-                return f"1부터 {len(self.state['hs10_candidates'])} 사이의 번호를 입력해 주세요."
+                return f"1부터 {len(candidates)} 사이의 번호를 입력해 주세요."
         else:
             return f"숫자를 입력해 주세요. (예: 1, 2, 3)"
 
