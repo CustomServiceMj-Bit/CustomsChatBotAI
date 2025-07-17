@@ -186,6 +186,8 @@ class TariffPredictionWorkflow:
             scenario=self.state.get('scenario')
         )
         resp: TariffPredictionResponse = tariff_prediction_step_api(req)
+        if resp.message and (not resp.hs6_candidates):
+            return resp.message
         self.state['hs6_candidates'] = resp.hs6_candidates
         self.state['current_step'] = 'hs6_selection'
         return f"상품묘사: {parsed['product_name']}\n국가: {parsed['country']}\n가격: {parsed['price']:,}원\n수량: {parsed.get('quantity', 1)}개\n\nHS6 코드 후보를 찾았습니다. 번호를 선택해 주세요:\n" + '\n'.join([
@@ -217,6 +219,8 @@ class TariffPredictionWorkflow:
                     hs6_code=selected['code']
                 )
                 resp: TariffPredictionResponse = tariff_prediction_step_api(req)
+                if resp.message and (not resp.hs10_candidates):
+                    return resp.message
                 self.state['hs10_candidates'] = resp.hs10_candidates
                 self.state['current_step'] = 'hs10_selection'
                 return f"선택하신 HS6 코드: {selected['code']}\n\nHS10 코드 후보를 선택해 주세요:\n" + '\n'.join([
