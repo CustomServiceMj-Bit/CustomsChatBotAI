@@ -37,7 +37,7 @@ def create_customs_graph():
     )
     
     # 각 에이전트에서 final_agent로
-    workflow.add_edge("customs_tracking", "final_agent")
+    workflow.add_edge("customs_tracking", END)
     workflow.add_edge("tariff_prediction", "final_agent")
     workflow.add_edge("qna", "final_agent")
     # final_agent에서 종료점으로
