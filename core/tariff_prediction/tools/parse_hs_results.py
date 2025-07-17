@@ -58,7 +58,7 @@ def generate_hs10_candidates(hs6_code: str) -> List[Dict]:
         candidates = []
         for _, row in matching_rows.iterrows():
             candidates.append({
-                'code': row['HS10'],
+                'code': str(row['HS10']),  # 항상 문자열로 변환
                 'description': row['한글품목명']
             })
         

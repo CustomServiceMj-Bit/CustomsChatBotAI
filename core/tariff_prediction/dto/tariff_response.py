@@ -1,5 +1,5 @@
 from pydantic import BaseModel
-from typing import List, Optional
+from typing import List, Optional, Dict, Any, Literal
 
 class HSClassificationResult(BaseModel):
     """HS 코드 분류 결과"""
@@ -25,9 +25,8 @@ class ExchangeRateResult(BaseModel):
     date: str
 
 class TariffPredictionResponse(BaseModel):
-    """관세 예측 응답 DTO"""
-    product_description: str
-    hs_classifications: List[HSClassificationResult]
-    tariff_calculation: Optional[TariffCalculationResult] = None
-    exchange_rate: Optional[ExchangeRateResult] = None
-    total_response: str 
+    step: Literal["hs6_select", "hs10_select", "result"]  # 다음 단계
+    hs6_candidates: Optional[List[Dict[str, Any]]] = None     # HS6 후보 리스트 (input 단계 응답)
+    hs10_candidates: Optional[List[Dict[str, Any]]] = None    # HS10 후보 리스트 (hs6_select 단계 응답)
+    calculation_result: Optional[Dict[str, Any]] = None       # 관세 계산 결과 (hs10_select 단계 응답)
+    message: Optional[str] = None                             # 안내/에러 메시지 
