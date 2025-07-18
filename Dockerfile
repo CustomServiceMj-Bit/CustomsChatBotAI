@@ -18,4 +18,4 @@ ENV PYTHONUNBUFFERED=1
 EXPOSE 5050
 
 # Flask 앱 실행
-CMD ["gunicorn", "-b", "0.0.0.0:5050", "run:app"]
+CMD ["gunicorn", "-b", "0.0.0.0:5050", "--timeout", "90", "run:app"]
