@@ -162,7 +162,15 @@ class TariffPredictionWorkflow:
             self.state['scenario'] = detected_scenario
             self.state['current_step'] = 'input_collection'
             self.state['session_active'] = True
-            response = f"'{detected_scenario}'로 인식했습니다! 이제 구매하신 상품에 대해 자유롭게 말씀해 주세요.\n\n💡 **상품 묘사의 정확도가 높을수록 정확한 관세 예측이 가능합니다!**\n\n예시:\n• \"아랫창은 고무로 되어있고 하얀색 운동화를 80000원에 독일에서 샀어요\"\n• \"인텔 i7 노트북을 150만원에 미국에서 구매했어요\"\n• \"블루투스 이어폰 2개를 12만원에 일본에서 샀어요\"\n\n위 예시를 참고하여 상품 정보를 입력해 주세요."
+            response = (
+                "구매하신 상품 정보를 입력해 주세요!\n\n"
+                "💡 **상품 묘사의 정확도가 높을수록 정확한 관세 예측이 가능합니다!**\n\n"
+                "예시:\n"
+                "• \"아랫창은 고무로 되어있고 하얀색 운동화를 80000원에 독일에서 샀어요\"\n"
+                "• \"인텔 i7 노트북을 150만원에 미국에서 구매했어요\"\n"
+                "• \"블루투스 이어폰 2개를 12만원에 일본에서 샀어요\"\n\n"
+                "위 예시를 참고하여 상품 정보를 입력해 주세요."
+            )
             self.state['responses'].append(response)
             return response
         
@@ -171,7 +179,15 @@ class TariffPredictionWorkflow:
             self.state['scenario'] = self.scenarios[user_input]
             self.state['current_step'] = 'input_collection'
             self.state['session_active'] = True
-            response = f"'{self.state['scenario']}'로 선택하셨습니다! 이제 구매하신 상품에 대해 자유롭게 말씀해 주세요.\n\n💡 **상품 묘사의 정확도가 높을수록 정확한 관세 예측이 가능합니다!**\n\n예시:\n• \"아랫창은 고무로 되어있고 하얀색 운동화를 80000원에 독일에서 샀어요\"\n• \"인텔 i7 노트북을 150만원에 미국에서 구매했어요\"\n• \"블루투스 이어폰 2개를 12만원에 일본에서 샀어요\"\n\n위 예시를 참고하여 상품 정보를 입력해 주세요."
+            response = (
+                "구매하신 상품 정보를 입력해 주세요!\n\n"
+                "💡 **상품 묘사의 정확도가 높을수록 정확한 관세 예측이 가능합니다!**\n\n"
+                "예시:\n"
+                "• \"아랫창은 고무로 되어있고 하얀색 운동화를 80000원에 독일에서 샀어요\"\n"
+                "• \"인텔 i7 노트북을 150만원에 미국에서 구매했어요\"\n"
+                "• \"블루투스 이어폰 2개를 12만원에 일본에서 샀어요\"\n\n"
+                "위 예시를 참고하여 상품 정보를 입력해 주세요."
+            )
             self.state['responses'].append(response)
             return response
         
@@ -203,15 +219,35 @@ class TariffPredictionWorkflow:
         parsed = self.parse_user_input(enhanced_input)
         # 필수 정보 확인
         missing_info = []
-        if 'product_name' not in parsed:
-            missing_info.append("상품에 대한 묘사")
-        if 'country' not in parsed:
+        if 'product_name' not in parsed or not parsed['product_name']:
+            missing_info.append("상품명")
+        if 'country' not in parsed or not parsed['country']:
             missing_info.append("구매 국가")
-        if 'price' not in parsed:
+        if 'price' not in parsed or not parsed['price']:
             missing_info.append("상품 가격")
         if missing_info:
+            # 이미 입력된 정보는 보여주고, 누락된 정보만 안내
+            info_lines = []
+            if 'product_name' in parsed and parsed['product_name']:
+                info_lines.append(f"상품명: {parsed['product_name']}")
+            if 'country' in parsed and parsed['country']:
+                info_lines.append(f"구매 국가: {parsed['country']}")
+            if 'price' in parsed and parsed['price']:
+                info_lines.append(f"상품 가격: {parsed['price']:,}원")
+            if 'quantity' in parsed and parsed['quantity']:
+                info_lines.append(f"수량: {parsed['quantity']}개")
+            info_str = "\n".join(info_lines)
             missing_str = ", ".join(missing_info)
-            response = f"다음 정보가 누락되었습니다: {missing_str}\n\n💡 **상품 묘사의 정확도가 높을수록 정확한 관세 예측이 가능합니다!**\n\n예시:\n• \"아랫창은 고무로 되어있고 하얀색 운동화를 80000원에 독일에서 샀어요\"\n• \"인텔 i7 노트북을 150만원에 미국에서 구매했어요\"\n• \"블루투스 이어폰 2개를 12만원에 일본에서 샀어요\""
+            response = (
+                (info_str + "\n\n" if info_str else "") +
+                f"다음 정보가 누락되었습니다: {missing_str}\n"
+                "💡 **상품명, 구매 국가, 상품 가격을 모두 입력해 주세요!**\n\n"
+                "예시:\n"
+                "• \"미국에서 150만원에 노트북을 샀어요\"\n"
+                "• \"일본에서 10만원짜리 이어폰을 구매했어요\"\n"
+                "• \"독일에서 80만원에 운동화 2켤레를 샀어요\"\n\n"
+                "위 예시를 참고하여 상품 정보를 입력해 주세요."
+            )
             self.state['responses'].append(response)
             return response
         # 상태 업데이트
@@ -232,7 +268,9 @@ class TariffPredictionWorkflow:
             return resp.message
         self.state['hs6_candidates'] = resp.hs6_candidates
         self.state['current_step'] = 'hs6_selection'
-        response = f"상품묘사: {parsed['product_name']}\n국가: {parsed['country']}\n가격: {parsed['price']:,}원\n수량: {parsed.get('quantity', 1)}개\n\nHS6 코드 후보를 찾았습니다. 번호를 선택해 주세요:\n" + '\n'.join([
+        scenario_str = self.state.get('scenario', '')
+        scenario_guide = f"{scenario_str}로 예상하고 안내를 도와드릴게요.\n\n" if scenario_str else ""
+        response = scenario_guide + f"상품묘사: {parsed['product_name']}\n국가: {parsed['country']}\n가격: {parsed['price']:,}원\n수량: {parsed.get('quantity', 1)}개\n\nHS6 코드 후보를 찾았습니다. 번호를 선택해 주세요:\n" + '\n'.join([
             f"{i+1}. {c['code']} - {c['description']} (신뢰도: {c['confidence']})" for i, c in enumerate(resp.hs6_candidates or [])
         ]) + f"\n\n💡 **위 후보 중 하나를 선택해 주세요.**\n예시: \"1번\", \"2번\", \"3번\" 등"
         self.state['responses'].append(response)
@@ -268,7 +306,7 @@ class TariffPredictionWorkflow:
                     return resp.message
                 self.state['hs10_candidates'] = resp.hs10_candidates
                 self.state['current_step'] = 'hs10_selection'
-                response = f"선택하신 HS6 코드: {selected['code']}\n\nHS10 코드 후보를 선택해 주세요:\n" + '\n'.join([
+                response = f"선택하신 HS 6자리 코드: {selected['code']}\n\nHS 10자리 코드 후보를 선택해 주세요:\n" + '\n'.join([
                     f"{i+1}. {c['code']} - {c['description']}" for i, c in enumerate(resp.hs10_candidates or [])
                 ]) + f"\n\n💡 **위 후보 중 하나를 선택해 주세요.**\n예시: \"1번\", \"2번\", \"3번\" 등"
                 self.state['responses'].append(response)

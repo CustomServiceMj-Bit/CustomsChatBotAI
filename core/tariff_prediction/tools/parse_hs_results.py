@@ -6,8 +6,11 @@ from langchain_core.tools import tool
 
 @tool
 def parse_hs6_result(hs6_result: str) -> List[Dict]:
-    """HS6 결과를 파싱합니다."""
+    """HS6 결과를 파싱합니다. (HS6.csv에서 검색텍스트도 함께 반환)"""
     candidates = []
+    # HS6.csv 파일 로드
+    data_dir = os.path.join(os.path.dirname(__file__), '..', 'data')
+    hs6_df = pd.read_csv(os.path.join(data_dir, 'HS6.csv'), dtype={'HS코드': str})
     
     # 결과에서 HS 코드와 확률 추출
     lines = hs6_result.strip().split('\n')
@@ -20,9 +23,14 @@ def parse_hs6_result(hs6_result: str) -> List[Dict]:
                 code = match.group(2)
                 confidence = float(match.group(3)) / 100.0
                 hs6_code = code[:4] + '.' + code[4:]
+                # HS6.csv에서 정보 찾기
+                hs6_row = hs6_df[hs6_df['HS코드'] == code]
+                search_text = ""
+                if not hs6_row.empty:
+                    search_text = str(hs6_row.iloc[0]['검색텍스트'])
                 candidates.append({
                     'code': hs6_code,
-                    'description': f'HS6 코드 {hs6_code}',
+                    'description': f'HS코드: {code}, 설명: {search_text}',
                     'confidence': confidence,
                     'full_code': code
                 })
