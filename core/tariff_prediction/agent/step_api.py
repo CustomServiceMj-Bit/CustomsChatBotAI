@@ -6,7 +6,7 @@ from core.tariff_prediction.tools.calculate_tariff_amount import calculate_tarif
 from core.shared.utils.llm import get_llm
 
 def tariff_prediction_step_api(req: TariffPredictionRequest) -> TariffPredictionResponse:
-    step = req.stepㄴ
+    step = req.step
     # Step 자동 분류: step이 'auto'이거나 비어 있으면 LLM으로 분류
     if not step or step == 'auto':
         llm = get_llm()
@@ -36,7 +36,7 @@ def tariff_prediction_step_api(req: TariffPredictionRequest) -> TariffPrediction
         return TariffPredictionResponse(
             step="hs10_select",
             hs10_candidates=hs10_candidates,
-            message="해당하는 HS10 코드를 선택해 주세요."
+            message="HS10 코드 후보를 선택해 주세요."
         )
     elif step == "hs10_select":
         # HS10 코드, 국가, 가격 등 입력받아 관세 계산
@@ -63,6 +63,6 @@ def tariff_prediction_step_api(req: TariffPredictionRequest) -> TariffPrediction
             )
     else:
         return TariffPredictionResponse(
-            step="input",
+            step="hs6_select",
             message="잘못된 요청입니다. 상품 설명을 입력해 주세요."
         ) 
