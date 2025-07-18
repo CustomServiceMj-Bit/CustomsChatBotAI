@@ -126,6 +126,9 @@ def calculate_tariff_amount(product_code: str, value: float, origin_country: str
             return f"관세율 조회 실패: {tariff_info['오류']}"
         
         # 환율 조회
+        if not origin_country or origin_country.strip() == "":
+            origin_country = "미국"  # 기본값으로 미국 설정
+        
         cur_unit = find_unit(origin_country, currency_df)
         if cur_unit is None:
             return f"환율 정보를 찾을 수 없습니다. 국가: {origin_country}"

@@ -4,6 +4,7 @@
 # - 답변은 마크다운, 끝에 책임 한계 안내문구 필수
 
 import re
+from typing import List
 from core.shared.states.states import CustomsAgentState
 from core.shared.utils.llm import get_llm
 from langchain_core.messages import SystemMessage, HumanMessage, AIMessage
@@ -22,15 +23,17 @@ SYSTEM_PROMPT = """
 - 통관·관세와 무관한 질문(예: 음식, 연애, 일상 상담 등)은 정중히 거절합니다.
 
 [질문 분류 규칙]
-- 다음 키워드가 포함되면 ‘통관 관련’으로 간주합니다: 관세, 통관, HS 코드, 과세가격, 원산지, 관세법, AEO, 수입신고, 세율, 관세환급 등.
-- 키워드가 없더라도 질문 의미상 통관 절차·세금·신고와 직접 연관되면 ‘통관 관련’으로 처리합니다.
-- 위 조건에 해당하지 않으면 ‘무관한 질문’으로 간주하고 정중히 거절합니다.
+- 다음 키워드가 포함되면 '통관 관련'으로 간주합니다: 관세, 통관, HS 코드, 과세가격, 원산지, 관세법, AEO, 수입신고, 세율, 관세환급 등.
+- 키워드가 없더라도 질문 의미상 통관 절차·세금·신고와 직접 연관되면 '통관 관련'으로 처리합니다.
+- **tariff_prediction 에이전트에서 온 응답은 항상 통관 관련으로 간주합니다.**
+- 위 조건에 해당하지 않으면 '무관한 질문'으로 간주하고 정중히 거절합니다.
 
 [출력 규칙]
 1. 전체 출력은 **마크다운(Markdown) 형식**으로 작성합니다.
 2. 다음 원칙을 따릅니다:
    - 질문이 통관/관세 관련이 **아닌 경우**: 정중히 거절하는 짧은 메시지만 출력합니다.
    - 질문이 통관/관세 관련인 경우: 주어진 근거 자료(qna_agent 결과)만 활용하여 요약된 정보를 제공합니다.
+   - **tariff_prediction 에이전트에서 온 경우**: 해당 응답을 그대로 사용합니다.
    - 답변 이후 활용한 근거 및 조항에 대해 출처를 반드시 밝혀야 합니다. 
 3. 답변 말미에 반드시 아래의 **책임 한계 안내 문구**를 포함해야 합니다.
 4. Chain-of-Thought(COT)는 내부 추론 과정에서만 활용하며, 최종 출력에는 포함하지 않습니다.
@@ -43,14 +46,39 @@ def final_agent(state: CustomsAgentState) -> CustomsAgentState:
     llm = get_llm()
     query = state.get("query", "")
     prev_reply = state.get("final_response", "")
+    intent = state.get("intent", "")
+    messages = state.get("messages", [])
+    
+    # tariff_prediction 에이전트에서 온 경우 해당 응답을 그대로 사용
+    if intent == "tariff_prediction" and prev_reply:
+        return state
+    
     try:
-        messages = [
-            SystemMessage(content=SYSTEM_PROMPT),
-            HumanMessage(content=query),
-            AIMessage(content=prev_reply)
-        ]
-        result = llm.invoke(messages)
+        # 대화 히스토리를 포함한 메시지 구성
+        from langchain_core.messages import BaseMessage
+        llm_messages: List[BaseMessage] = [SystemMessage(content=SYSTEM_PROMPT)]
+        
+        # 기존 대화 히스토리 추가 (최근 10개 메시지로 제한)
+        if messages:
+            recent_messages = messages[-10:]  # 최근 10개 메시지만 사용
+            llm_messages.extend(recent_messages)
+        
+        # 현재 쿼리 추가
+        llm_messages.append(HumanMessage(content=query))
+        
+        # 이전 응답이 있으면 추가
+        if prev_reply:
+            llm_messages.append(AIMessage(content=prev_reply))
+        
+        result = llm.invoke(llm_messages)
         state["final_response"] = str(result.content) if hasattr(result, "content") else str(result)
+        
+        # 대화 히스토리에 현재 대화 추가
+        if "messages" not in state:
+            state["messages"] = []
+        state["messages"].append(HumanMessage(content=query))
+        state["messages"].append(AIMessage(content=state["final_response"]))
+        
     except Exception as e:
         # LLM 실패시 기존 답변 유지
         pass
