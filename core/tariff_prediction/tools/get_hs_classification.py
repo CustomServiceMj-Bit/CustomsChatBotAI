@@ -63,7 +63,7 @@ def predict_hs_code(item_description: str, embedding_model, label_encoder, class
     top5_prob_cpu = top5_prob.cpu().numpy().flatten()
     predicted_hs_codes = label_encoder.inverse_transform(top5_indices_cpu)
     for code, prob in zip(predicted_hs_codes, top5_prob_cpu):
-        results.append({"hs_code": code, "probability": f"{prob:.2%}"})
+        results.append({"hs_code": code, "probability": f"{round(prob, 3):.1%}"})
     return results
 
 @tool
