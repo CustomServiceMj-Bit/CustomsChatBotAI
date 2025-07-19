@@ -3,8 +3,6 @@ import re
 
 from core.shared.states.states import CustomsAgentState
 from core.tariff_prediction.tools.calculate_tariff_amount import calculate_tariff_amount
-from core.tariff_prediction.tools.get_hs_classification import get_hs_classification
-from core.tariff_prediction.tools.clean_product_description import clean_product_description
 from core.tariff_prediction.tools.detect_scenario import detect_scenario_from_input
 from core.tariff_prediction.tools.parse_user_input import parse_user_input
 from core.tariff_prediction.tools.parse_hs_results import parse_hs6_result, generate_hs10_candidates
@@ -14,7 +12,7 @@ from core.tariff_prediction.constants import (
     SESSION_TERMINATION_KEYWORDS, REPREDICTION_KEYWORDS, SIMPLE_TARIFF_REQUESTS, 
     TARIFF_CONTEXT_KEYWORDS, DEFAULT_EXCHANGE_RATES,
     DEFAULT_COUNTRY, DEFAULT_QUANTITY, DEFAULT_SHIPPING_COST, DEFAULT_SESSION_ID,
-    INPUT_EXAMPLES, GUIDE_MESSAGES, ERROR_MESSAGES, CORRECTION_MESSAGES, LLM_PROMPTS
+    ERROR_MESSAGES, CORRECTION_MESSAGES
 )
 from core.tariff_prediction.tools.context_utils import extract_llm_response, extract_info_from_context, merge_context_with_current
 from core.tariff_prediction.agent.step_api import tariff_prediction_step_api

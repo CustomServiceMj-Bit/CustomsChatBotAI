@@ -6,8 +6,6 @@ WORKDIR /app
 # 의존성 설치
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
-# 인증서 설치
-RUN apt-get update && apt-get install -y ca-certificates && update-ca-certificates
 
 # 전체 코드 복사
 COPY . .
