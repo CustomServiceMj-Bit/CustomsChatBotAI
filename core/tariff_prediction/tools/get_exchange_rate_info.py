@@ -29,7 +29,7 @@ def get_exchange_rate_api(cur_unit: str, situation: str = '해외직구'):
 
     try:
         response = requests.get(KOREAEXIM_API_URL, params=params)
-        response.raise_for_status()  
+        response.raise_for_status()
         data = pd.DataFrame(response.json())
 
         filtered_data = data[data['cur_unit'] == cur_unit]
@@ -48,6 +48,7 @@ def get_exchange_rate_api(cur_unit: str, situation: str = '해외직구'):
 
         return usd_rate
     except Exception as e:
+        print("환율 api 오류: ",e)
         return None  # 오류 시 None 반환
 
 @tool
