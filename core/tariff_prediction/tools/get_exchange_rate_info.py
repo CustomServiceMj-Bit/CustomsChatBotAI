@@ -3,7 +3,6 @@ from datetime import datetime
 import pandas as pd
 import re
 from langchain_core.tools import tool
-import os
 
 from core.tariff_prediction.constants.api_config import KOREAEXIM_API_URL, KOREAEXIM_API_KEY
 from core.tariff_prediction.constants import SUPPORTED_COUNTRIES
