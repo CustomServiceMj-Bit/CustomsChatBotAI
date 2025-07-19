@@ -97,7 +97,11 @@ def parse_tariff_result(tariff_result: str) -> Dict[str, Any]:
 |------|------|
 | **적용 관세 규칙** | {parsed['tariff_rule']} |
 | **FTA 적용** | {parsed['fta_applied']} |
-| **비고** | {parsed['note']} |"""
+| **비고** | {parsed['note']} |
+
+---
+
+**본 답변은 신청자가 제시한 자료만을 근거로 작성하였으며, 법적 효력을 갖는 유권해석(결정, 판단)이 아니므로 각종 신고, 불복청구 등의 증거자료로 사용할 수 없습니다.**"""
         
         parsed['formatted_result'] = formatted_result
         
