@@ -3,16 +3,37 @@ import os
 from langchain_core.tools import tool
 from core.tariff_prediction.tools.get_exchange_rate_info import get_exchange_rate_api
 
-def find_unit(country: str, df: pd.DataFrame) -> str:
-    """국가별 통화 단위를 찾습니다."""
+def find_unit(country: str, df) -> str:
+    """국가별 통화 단위를 찾습니다. df는 pandas DataFrame이어야 합니다."""
+    if not isinstance(df, pd.DataFrame):
+        # numpy ndarray 등에서 DataFrame으로 변환 시 columns 지정 필요
+        if hasattr(df, 'shape') and len(df.shape) == 2 and df.shape[1] == 2:
+            df = pd.DataFrame(df)
+            df.columns = ['country', 'cur_unit']
+        else:
+            df = pd.DataFrame(df)
+    if 'country' not in df.columns or 'cur_unit' not in df.columns:
+        return 'USD'
     if country in df['country'].unique().tolist():
-        result = df[df['country'] == country]['cur_unit'].iloc[0]
-        return result
+        if isinstance(df, pd.DataFrame):
+            result = df[df['country'] == country]['cur_unit'].iloc[0]
+            return str(result)
+        else:
+            return 'USD'
     else:
-        return None  # 국가 정보가 없으면 None 반환
+        return 'USD'  # 국가 정보가 없으면 USD 반환 (None이 아닌 str)
 
-def get_tariff_info(hs_code: str, input_country: str, full_tariff_df: pd.DataFrame):
-    """주어진 HS코드와 국가명으로, 우선순위에 따라 가장 적합한 관세율 정보를 찾아 반환합니다."""
+def get_tariff_info(hs_code: str, input_country: str, full_tariff_df) -> dict:
+    """주어진 HS코드와 국가명으로, 우선순위에 따라 가장 적합한 관세율 정보를 찾아 반환합니다. full_tariff_df는 pandas DataFrame이어야 합니다."""
+    if not isinstance(full_tariff_df, pd.DataFrame):
+        # numpy ndarray 등에서 DataFrame으로 변환 시 columns 지정 필요
+        if hasattr(full_tariff_df, 'shape') and len(full_tariff_df.shape) == 2 and full_tariff_df.shape[1] >= 5:
+            full_tariff_df = pd.DataFrame(full_tariff_df)
+            full_tariff_df.columns = ['number', 'country', 'tax_rate', 'fta', 'category']
+        else:
+            full_tariff_df = pd.DataFrame(full_tariff_df)
+    if 'number' not in full_tariff_df.columns or 'country' not in full_tariff_df.columns:
+        return {'오류': '관세 데이터 형식 오류'}
     EFTA_COUNTRIES = ['스위스', '리히텐슈타인', '아이슬란드', '노르웨이']
     ASEAN_COUNTRIES = [
         '브루나이', '캄보디아', '인도네시아', '라오스', '말레이시아', 
@@ -26,9 +47,12 @@ def get_tariff_info(hs_code: str, input_country: str, full_tariff_df: pd.DataFra
     ]
 
     # 1. HS코드로 전체 데이터프레임에서 관련 규칙을 먼저 필터링합니다.
-    item_df = full_tariff_df[full_tariff_df['number'] == hs_code]
+    if isinstance(full_tariff_df, pd.DataFrame):
+        item_df = full_tariff_df[full_tariff_df['number'] == hs_code]
+    else:
+        return {'오류': '관세 데이터 형식 오류'}
     
-    if item_df.empty:
+    if hasattr(item_df, 'empty') and item_df.empty:
         return {'오류': f"HS Code '{hs_code}'를 찾을 수 없습니다."}
 
     # 2. 검색할 우선순위 목록을 생성합니다.
@@ -132,13 +156,16 @@ def calculate_tariff_amount(product_code: str, value: float, origin_country: str
         cur_unit = find_unit(origin_country, currency_df)
         if cur_unit is None:
             return f"환율 정보를 찾을 수 없습니다. 국가: {origin_country}"
-        usd_rate = get_exchange_rate_api(cur_unit, situation)
-        # 환율이 None이면 더미값(1300.0)으로 대체
-        if usd_rate is None:
-            usd_rate = 1300.0
-        
+        # 원화 입력 시 환율 변환 생략
+        if cur_unit.upper() == 'KRW':
+            krw_rate = 1.0
+        else:
+            krw_rate = get_exchange_rate_api(cur_unit, situation)
+            if krw_rate is None:
+                krw_rate = 1300.0
+
         # 관세 계산
-        tax_info = calculate_tax_amount(value, item_count, shipping_cost, float(tariff_info['관세율']), usd_rate, situation)
+        tax_info = calculate_tax_amount(value, item_count, shipping_cost, float(tariff_info['관세율']), krw_rate, situation)
         
         # 부가가치세 계산
         VAT = 0

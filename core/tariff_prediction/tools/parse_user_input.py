@@ -71,7 +71,8 @@ def parse_user_input(user_input: str) -> Dict[str, Any]:
 아래는 관세 예측을 위한 사용자 입력입니다. 입력에서 다음 정보를 추출해 JSON으로 반환하세요.
 - product_name: 상품명 또는 상품 설명 (예: 노트북, 운동화, 블루투스 이어폰)
 - country: 구매 국가 (예: 미국, 일본, 독일 등)
-- price: 상품 가격(숫자만, 단위는 원)
+- price: 상품 가격(원화가 아닌 경우 원래 통화 단위 그대로 유지, 숫자만)
+- price_unit: 가격 단위 (원, 달러, 엔, 위안, 유로 등)
 - quantity: 수량(숫자, 없으면 1)
 
 입력: "{user_input}"
@@ -80,7 +81,18 @@ def parse_user_input(user_input: str) -> Dict[str, Any]:
 {{
   "product_name": "노트북",
   "country": "미국",
-  "price": 1500000,
+  "price": 150,
+  "price_unit": "달러",
+  "quantity": 1
+}}
+
+또는
+
+{{
+  "product_name": "운동화",
+  "country": "독일",
+  "price": 80,
+  "price_unit": "유로",
   "quantity": 1
 }}
 

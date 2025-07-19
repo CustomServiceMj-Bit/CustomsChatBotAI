@@ -9,7 +9,14 @@ from core.tariff_prediction.tools.detect_scenario import detect_scenario_from_in
 from core.tariff_prediction.tools.parse_user_input import parse_user_input
 from core.tariff_prediction.tools.parse_hs_results import parse_hs6_result, generate_hs10_candidates
 from core.tariff_prediction.tools.parse_tariff_result import parse_tariff_result
-from core.tariff_prediction.constants import SUPPORTED_COUNTRIES, SCENARIOS, OFF_TOPIC_KEYWORDS, CORRECTION_KEYWORDS, SESSION_TERMINATION_KEYWORDS
+from core.tariff_prediction.constants import (
+    SUPPORTED_COUNTRIES, SCENARIOS, OFF_TOPIC_KEYWORDS, CORRECTION_KEYWORDS, 
+    SESSION_TERMINATION_KEYWORDS, REPREDICTION_KEYWORDS, SIMPLE_TARIFF_REQUESTS, 
+    TARIFF_CONTEXT_KEYWORDS, DEFAULT_EXCHANGE_RATES,
+    DEFAULT_COUNTRY, DEFAULT_QUANTITY, DEFAULT_SHIPPING_COST, DEFAULT_SESSION_ID,
+    INPUT_EXAMPLES, GUIDE_MESSAGES, ERROR_MESSAGES, CORRECTION_MESSAGES, LLM_PROMPTS
+)
+from core.tariff_prediction.tools.context_utils import extract_llm_response, extract_info_from_context, merge_context_with_current
 from core.tariff_prediction.agent.step_api import tariff_prediction_step_api
 from core.tariff_prediction.dto.tariff_request import TariffPredictionRequest
 from core.tariff_prediction.dto.tariff_response import TariffPredictionResponse
@@ -40,8 +47,8 @@ class TariffPredictionWorkflow:
             'product_name': None,
             'country': None,
             'price': None,
-            'quantity': 1,
-            'shipping_cost': 0,
+            'quantity': DEFAULT_QUANTITY,
+            'shipping_cost': DEFAULT_SHIPPING_COST,
             'hs6_code': None,
             'hs10_code': None,
             'current_step': 'scenario_selection',
@@ -61,8 +68,8 @@ class TariffPredictionWorkflow:
             'product_name': None,
             'country': None,
             'price': None,
-            'quantity': 1,
-            'shipping_cost': 0,
+            'quantity': DEFAULT_QUANTITY,
+            'shipping_cost': DEFAULT_SHIPPING_COST,
             'hs6_code': None,
             'hs10_code': None,
             'current_step': 'scenario_selection',
@@ -90,13 +97,15 @@ class TariffPredictionWorkflow:
         """수정 요청을 처리합니다."""
         if any(word in user_input for word in CORRECTION_KEYWORDS):
             if self.state['current_step'] == 'scenario_selection':
-                return "어떤 정보를 수정하시겠습니까?\n1. 시나리오\n2. 상품 정보\n3. 처음부터 다시 시작"
+                return CORRECTION_MESSAGES['scenario_selection']
             elif self.state['current_step'] == 'input_collection':
-                return "어떤 정보를 수정하시겠습니까?\n1. 상품묘사\n2. 국가\n3. 가격\n4. 수량\n5. 배송비\n6. 처음부터 다시 시작"
+                return CORRECTION_MESSAGES['input_collection']
             elif self.state['current_step'] == 'hs6_selection':
-                return "HS6 코드 선택을 다시 하시겠습니까?"
+                # HS6 코드 선택 단계에서 수정 요청 시 바로 재예측 수행
+                return self._perform_hs6_reprediction(user_input)
             elif self.state['current_step'] == 'hs10_selection':
-                return "HS10 코드 선택을 다시 하시겠습니까?"
+                # HS10 코드 선택 단계에서는 재예측 기능 없음
+                return "💡 **번호를 입력해 주세요.** (예: 1, 2, 3)"
         
         return ""
 
@@ -120,13 +129,12 @@ class TariffPredictionWorkflow:
         # 세션 중단 요청 확인
         if any(word in current_query for word in SESSION_TERMINATION_KEYWORDS):
             self.reset_session()
-            return "관세 계산을 중단하겠습니다. 다른 질문이 있으시면 언제든 말씀해 주세요."
+            return ERROR_MESSAGES['session_terminated']
 
         # 탈선 처리 - 컨텍스트를 고려하여 더 정확한 판단
         if self.state['session_active']:
             # 이전 대화에서 관세 관련 키워드가 있었는지 확인
-            has_tariff_context = any(keyword in user_input.lower() for keyword in 
-                                   ['관세', '세금', '통관', 'hs', '코드', '가격', '원', '달러', '엔', '유로'])
+            has_tariff_context = any(keyword in user_input.lower() for keyword in TARIFF_CONTEXT_KEYWORDS)
             
             # 관세 관련 컨텍스트가 있으면 탈선으로 간주하지 않음
             if not has_tariff_context and self.is_off_topic(current_query):
@@ -137,9 +145,15 @@ class TariffPredictionWorkflow:
         if correction_response:
             return correction_response
 
+        # 재예측 요청 확인 (HS6 선택 단계에서만)
+        if self.state['current_step'] == 'hs6_selection':
+            user_input_lower = current_query.lower()
+            
+            if any(keyword in user_input_lower for keyword in REPREDICTION_KEYWORDS):
+                return self._perform_hs6_reprediction(current_query)
+
         # 간단한 관세 요청인지 확인 ("관세 계산해줘", "관세 예측해줘" 등)
-        simple_tariff_requests = ["관세 계산해줘", "관세 예측해줘", "관세 계산", "관세 예측", "세금 계산해줘", "세금 예측해줘"]
-        if current_query.strip() in simple_tariff_requests:
+        if current_query.strip() in SIMPLE_TARIFF_REQUESTS:
             return "관세 계산을 위해 다음 정보가 필요합니다:\n\n• 상품명 또는 상품 설명\n• 구매 국가\n• 상품 가격\n• 수량 (선택사항)\n\n💡 **다음과 같이 입력해 주세요:**\n• \"미국에서 150만원에 노트북을 샀어요\"\n• \"일본에서 10만원짜리 이어폰을 구매했어요\"\n• \"독일에서 80만원에 운동화 2켤레를 샀어요\"\n\n위 예시 중 하나를 참고하여 상품 정보를 입력해 주세요."
 
         # 현재 단계별 처리
@@ -211,10 +225,10 @@ class TariffPredictionWorkflow:
             current_part = user_input.split("현재 질문:")[1].strip() if "현재 질문:" in user_input else user_input
             
             # 컨텍스트에서 상품 정보 추출 시도
-            context_info = self.extract_info_from_context(context_part)
+            context_info = extract_info_from_context(context_part)
             if context_info:
                 # 현재 입력에 누락된 정보를 컨텍스트에서 보완
-                enhanced_input = self.merge_context_with_current(context_info, current_part)
+                enhanced_input = merge_context_with_current(context_info, current_part)
         
         parsed = self.parse_user_input(enhanced_input)
         # 필수 정보 확인
@@ -250,14 +264,41 @@ class TariffPredictionWorkflow:
             )
             self.state['responses'].append(response)
             return response
+        # 환율 변환 처리
+        price = parsed['price']
+        price_unit = parsed.get('price_unit', '원')
+        
+        # 원화가 아닌 경우 환율 변환
+        if price_unit != '원':
+            try:
+                from core.tariff_prediction.tools.get_exchange_rate_info import get_exchange_rate_api
+                exchange_rate = get_exchange_rate_api(price_unit, self.state.get('scenario', '해외직구'))
+                if exchange_rate:
+                    price = price * exchange_rate
+                    price_unit = '원'
+                else:
+                    # 환율 조회 실패 시 기본 환율 사용
+                    if price_unit in DEFAULT_EXCHANGE_RATES:
+                        price = price * DEFAULT_EXCHANGE_RATES[price_unit]
+                        price_unit = '원'
+            except Exception as e:
+                print(f"[DEBUG] 환율 변환 오류: {e}")
+                # 오류 시 기본 환율 사용
+                if price_unit in DEFAULT_EXCHANGE_RATES:
+                    price = price * DEFAULT_EXCHANGE_RATES[price_unit]
+                    price_unit = '원'
+        
         # 상태 업데이트
         self.state.update(parsed)
+        self.state['price'] = price
+        self.state['price_unit'] = price_unit
+        
         # step_api.py 활용
         req = TariffPredictionRequest(
             step="input",
             product_description=parsed['product_name'],
             origin_country=parsed['country'],
-            price=parsed['price'],
+            price=price,
             quantity=parsed.get('quantity', 1),
             shipping_cost=parsed.get('shipping_cost', 0),
             scenario=self.state.get('scenario')
@@ -270,8 +311,16 @@ class TariffPredictionWorkflow:
         self.state['current_step'] = 'hs6_selection'
         scenario_str = self.state.get('scenario', '')
         scenario_guide = f"{scenario_str}로 예상하고 안내를 도와드릴게요.\n\n" if scenario_str else ""
-        response = scenario_guide + f"상품묘사: {parsed['product_name']}\n국가: {parsed['country']}\n가격: {parsed['price']:,}원\n수량: {parsed.get('quantity', 1)}개\n\nHS6 코드 후보를 찾았습니다. 번호를 선택해 주세요:\n" + '\n'.join([
-            f"{i+1}. {c['code']} - {c['description']} (신뢰도: {c['confidence']})" for i, c in enumerate(resp.hs6_candidates or [])
+        
+        # 가격 표시 (원화 변환된 경우)
+        price_display = f"{price:,.0f}원"
+        if price_unit != '원' and parsed.get('price_unit') != '원':
+            original_price = parsed.get('price', price)
+            original_unit = parsed.get('price_unit', price_unit)
+            price_display = f"{original_price} {original_unit} (약 {price:,.0f}원)"
+        
+        response = scenario_guide + f"상품묘사: {parsed['product_name']}\n국가: {parsed['country']}\n가격: {price_display}\n수량: {parsed.get('quantity', 1)}개\n\nHS 코드 예측 모델로부터 HS6 코드 후보를 찾았습니다. 번호를 선택해 주세요:\n" + '\n'.join([
+                            f"{i+1}. {c['description']} (신뢰도: {c['confidence']:.1%})" for i, c in enumerate(resp.hs6_candidates or [])
         ]) + f"\n\n💡 **위 후보 중 하나를 선택해 주세요.**\n예시: \"1번\", \"2번\", \"3번\" 등"
         self.state['responses'].append(response)
         return response
@@ -288,8 +337,14 @@ class TariffPredictionWorkflow:
         return formatted
 
     def handle_hs6_selection(self, user_input: str) -> str:
+        from core.tariff_prediction.tools.parse_hs_results import parse_hs6_result
+        from core.shared.utils.llm import get_llm
+        
+        # 숫자 입력 확인
         number_match = re.search(r'(\d+)', user_input)
+        
         if number_match and self.state.get('hs6_candidates'):
+            # 번호가 입력된 경우 - 기존 로직
             selection = int(number_match.group(1))
             candidates = self.state['hs6_candidates']
             if 1 <= selection <= len(candidates):
@@ -312,13 +367,52 @@ class TariffPredictionWorkflow:
                 self.state['responses'].append(response)
                 return response
             else:
-                response = f"1부터 {len(candidates)} 사이의 번호를 입력해 주세요."
+                response = f"**잘못된 번호입니다.**\n\n1부터 {len(candidates)} 사이의 번호를 다시 입력해 주세요.\n\n예시: \"1번\", \"2번\", \"3번\" 등"
                 self.state['responses'].append(response)
                 return response
         else:
-            response = f"숫자를 입력해 주세요. (예: 1, 2, 3)"
-            self.state['responses'].append(response)
-            return response
+            # 번호가 아닌 입력인 경우 - 재예측 의도 판단
+            try:
+                # 간단한 키워드 기반 판단으로 먼저 시도
+                reprediction_keywords = ["없다", "코드가 없다", "재예측", "다시", "틀렸다", "맞지 않다", "다른", "새로", "다시 예측", "다른 코드", "적합하지 않다", "코드가 없어"]
+                user_input_lower = user_input.lower()
+                
+                # 키워드 매칭으로 빠른 판단
+                if any(keyword in user_input_lower for keyword in reprediction_keywords):
+                    return self._perform_hs6_reprediction(user_input)
+                
+                # 키워드 매칭이 안 되면 LLM으로 판단
+                llm = get_llm()
+                
+                # 재예측 의도 판단을 위한 명확한 프롬프트
+                intent_prompt = f"""사용자의 입력이 HS 코드 후보가 적합하지 않아서 재예측을 요청하는 의도인지 판단해주세요.
+
+재예측 의도로 보이는 키워드: "없다", "코드가 없다", "재예측", "다시", "틀렸다", "맞지 않다", "다른", "새로", "다시 예측", "다른 코드", "적합하지 않다"
+
+사용자 입력: {user_input}
+
+위 입력이 재예측을 요청하는 의도인지 판단하여 '네' 또는 '아니오'로만 답변하세요. 반드시 한 단어로만 답변하세요."""
+
+                response = llm.invoke([{"role": "user", "content": intent_prompt}])
+                
+                # LLM 응답을 안전하게 추출
+                answer = self._extract_llm_response(response)
+                
+                if answer.lower() in ["네", "yes", "true", "1"]:
+                    # 재예측 의도로 판단된 경우
+                    return self._perform_hs6_reprediction(user_input)
+                else:
+                    # 재예측 의도가 아닌 경우 안내 메시지
+                    response = f"💡 **번호를 입력해 주세요.** (예: 1, 2, 3)\n\n만약 후보가 모두 적합하지 않으면 '코드가 없다', '다시', '재예측' 등으로 입력해 주세요."
+                    self.state['responses'].append(response)
+                    return response
+                    
+            except Exception as e:
+                print(f"[DEBUG] handle_hs6_selection intent detection error: {e}")
+                # 예외 발생 시 안내 메시지로 graceful 처리
+                response = f"입력 처리 중 오류가 발생했습니다. 숫자를 입력하거나, 재예측을 원하시면 '다시', '재예측' 등으로 입력해 주세요."
+                self.state['responses'].append(response)
+                return response
 
     def generate_hs10_candidates(self, hs6_code: str) -> List[Dict]:
         """HS10 후보를 생성합니다."""
@@ -332,17 +426,20 @@ class TariffPredictionWorkflow:
         return formatted
 
     def handle_hs10_selection(self, user_input: str) -> str:
+        # 숫자 입력 확인
         number_match = re.search(r'(\d+)', user_input)
+        
         if number_match and self.state.get('hs10_candidates'):
+            # 번호가 입력된 경우 - 기존 로직
             selection = int(number_match.group(1))
             candidates = self.state['hs10_candidates']
             if 1 <= selection <= len(candidates):
                 selected = candidates[selection - 1]
                 self.state['hs10_code'] = selected['code']
                 # step_api.py 활용
-                country = self.state.get('country', '미국')  # 기본값으로 미국 설정
+                country = self.state.get('country', DEFAULT_COUNTRY)  # 기본값으로 미국 설정
                 if not country or country.strip() == "":
-                    country = "미국"  # 빈 문자열이면 기본값 사용
+                    country = DEFAULT_COUNTRY  # 빈 문자열이면 기본값 사용
                 
                 req = TariffPredictionRequest(
                     step="hs10_select",
@@ -364,11 +461,118 @@ class TariffPredictionWorkflow:
                     self.state['responses'].append(response)
                     return response
             else:
-                response = f"1부터 {len(candidates)} 사이의 번호를 입력해 주세요."
+                response = f"**잘못된 번호입니다.**\n\n1부터 {len(candidates)} 사이의 번호를 다시 입력해 주세요.\n\n예시: \"1번\", \"2번\", \"3번\" 등"
                 self.state['responses'].append(response)
                 return response
         else:
-            response = f"숫자를 입력해 주세요. (예: 1, 2, 3)"
+            # 번호가 아닌 입력인 경우 - 단순히 번호 입력 안내
+            response = f"💡 **번호를 입력해 주세요.** (예: 1, 2, 3)"
+            self.state['responses'].append(response)
+            return response
+
+
+
+    def _perform_hs6_reprediction(self, user_input: str) -> str:
+        """HS6 코드 재예측을 수행합니다."""
+        from core.tariff_prediction.tools.parse_hs_results import parse_hs6_result
+        from core.shared.utils.llm import get_llm
+        
+        product_name = self.state.get('product_name')
+        if not product_name or not isinstance(product_name, str) or not product_name.strip():
+            response = "상품명을 알 수 없어 HS 코드 예측을 다시 시도할 수 없습니다. 처음부터 다시 입력해 주세요."
+            self.state['responses'].append(response)
+            return response
+        
+        try:
+            # 재예측을 위한 명확한 프롬프트
+            reprediction_prompt = f"""아래 상품명과 사용자의 추가 의견을 참고하여 HS 코드 후보를 예측해주세요.
+
+상품명: {product_name}
+사용자 추가 의견: {user_input}
+
+다음 형식으로 HS 코드 후보 3개 이내를 반환하세요:
+1. [6자리 HS코드] (확률: [확률]%)
+2. [6자리 HS코드] (확률: [확률]%)
+3. [6자리 HS코드] (확률: [확률]%)
+
+예시:
+1. 851770 (확률: 85.5%)
+2. 851712 (확률: 12.3%)
+3. 851713 (확률: 2.2%)"""
+
+            llm = get_llm()
+            hs6_response = llm.invoke([{"role": "user", "content": reprediction_prompt}])
+            hs6_result = extract_llm_response(hs6_response)
+            
+            # LLM 응답이 비어있거나 잘못된 경우 처리
+            if not hs6_result or len(hs6_result.strip()) < 10:
+                response = "HS 코드 예측에 실패했습니다. 상품명을 더 구체적으로 입력해 주세요."
+                self.state['responses'].append(response)
+                return response
+            
+            # parse_hs6_result 함수 호출 시 예외 처리
+            try:
+                hs6_candidates = parse_hs6_result(hs6_result)
+            except Exception as parse_error:
+                print(f"[DEBUG] parse_hs6_result error: {parse_error}")
+                response = "HS 코드 예측 결과를 처리하는 중 오류가 발생했습니다. 다시 시도해 주세요."
+                self.state['responses'].append(response)
+                return response
+            
+            if not hs6_candidates:
+                response = "HS 코드 예측에 다시 실패했습니다. 상품명을 더 구체적으로 입력해 주세요."
+                self.state['responses'].append(response)
+                return response
+            
+            self.state['hs6_candidates'] = hs6_candidates
+            scenario_str = self.state.get('scenario', '')
+            scenario_guide = f"{scenario_str}로 예상하고 안내를 도와드릴게요.\n\n" if scenario_str else ""
+            
+            response = scenario_guide + f"상품묘사: {product_name}\n국가: {self.state.get('country','')}\n가격: {self.state.get('price',0):,}원\n수량: {self.state.get('quantity',1)}개\n\nHS 코드 재예측 결과입니다. 번호를 선택해 주세요:\n" + '\n'.join([
+                f"{i+1}. {c['description']} (신뢰도: {c['confidence']:.1%})" for i, c in enumerate(hs6_candidates)
+            ]) + f"\n\n💡 **위 후보 중 하나를 선택해 주세요.**\n예시: \"1번\", \"2번\", \"3번\" 등"
+            
+            self.state['responses'].append(response)
+            return response
+            
+        except Exception as e:
+            print(f"[DEBUG] _perform_hs6_reprediction error: {e}")
+            response = "HS 코드 재예측 중 오류가 발생했습니다. 다시 시도해 주세요."
+            self.state['responses'].append(response)
+            return response
+
+    def _perform_hs10_reprediction(self, user_input: str) -> str:
+        """HS10 코드 재예측을 수행합니다."""
+        from core.tariff_prediction.tools.parse_hs_results import generate_hs10_candidates
+        from core.shared.utils.llm import get_llm
+        
+        hs6_code = self.state.get('hs6_code')
+        if not hs6_code:
+            response = "HS6 코드가 없어 HS10 코드 예측을 다시 시도할 수 없습니다. HS6 코드부터 다시 선택해 주세요."
+            self.state['responses'].append(response)
+            return response
+        
+        try:
+            # HS6 코드를 기반으로 HS10 후보 생성
+            hs10_candidates = generate_hs10_candidates(hs6_code)
+            
+            if not hs10_candidates:
+                response = "HS10 코드 예측에 실패했습니다. HS6 코드를 다시 선택해 주세요."
+                self.state['responses'].append(response)
+                return response
+            
+            self.state['hs10_candidates'] = hs10_candidates
+            
+            response = f"HS 6자리 코드: {hs6_code}\n\nHS 10자리 코드 재예측 결과입니다. 번호를 선택해 주세요:\n" + '\n'.join([
+                f"{i+1}. {c['code']} - {c['description']}" for i, c in enumerate(hs10_candidates)
+            ]) + f"\n\n💡 **위 후보 중 하나를 선택해 주세요.**\n예시: \"1번\", \"2번\", \"3번\" 등"
+            
+            self.state['responses'].append(response)
+            return response
+            
+        except Exception as e:
+            print(f"[DEBUG] _perform_hs10_reprediction error: {e}")
+            response = "HS10 코드 재예측 중 오류가 발생했습니다. 다시 시도해 주세요."
             self.state['responses'].append(response)
             return response
 
@@ -431,59 +635,7 @@ class TariffPredictionWorkflow:
         """관세 계산 결과를 파싱합니다."""
         return parse_tariff_result(tariff_result)
     
-    def extract_info_from_context(self, context: str) -> Dict[str, str]:
-        """컨텍스트에서 상품 정보를 추출합니다."""
-        info = {}
-        
-        # 국가 정보 추출
-        countries = ['미국', '일본', '중국', '독일', '프랑스', '이탈리아', '스페인', '영국', '캐나다', '호주']
-        for country in countries:
-            if country in context:
-                info['country'] = country
-                break
-        
-        # 가격 정보 추출
-        import re
-        price_patterns = [
-            r'(\d+)[,\s]*원',
-            r'(\d+)[,\s]*달러',
-            r'(\d+)[,\s]*엔',
-            r'(\d+)[,\s]*위안',
-            r'(\d+)[,\s]*유로',
-            r'(\d+)[,\s]*만원',
-            r'(\d+)[,\s]*천원'
-        ]
-        
-        for pattern in price_patterns:
-            match = re.search(pattern, context)
-            if match:
-                info['price'] = match.group(1)
-                break
-        
-        # 상품명 추출 (간단한 키워드 기반)
-        product_keywords = ['노트북', '운동화', '이어폰', '핸드폰', '옷', '신발', '가방', '시계', '책', '화장품']
-        for keyword in product_keywords:
-            if keyword in context:
-                info['product_name'] = keyword
-                break
-        
-        return info
-    
-    def merge_context_with_current(self, context_info: Dict[str, str], current_input: str) -> str:
-        """컨텍스트 정보와 현재 입력을 병합합니다."""
-        merged = current_input
-        
-        # 현재 입력에 없는 정보를 컨텍스트에서 추가
-        if 'country' in context_info and '국가' not in current_input and context_info['country'] not in current_input:
-            merged += f" {context_info['country']}에서"
-        
-        if 'price' in context_info and '원' not in current_input and '달러' not in current_input and '엔' not in current_input:
-            merged += f" {context_info['price']}원에"
-        
-        if 'product_name' in context_info and context_info['product_name'] not in current_input:
-            merged += f" {context_info['product_name']}"
-        
-        return merged
+
 
 def tariff_prediction_agent(state: CustomsAgentState) -> CustomsAgentState:
     """개선된 관세 예측 에이전트"""
@@ -491,7 +643,7 @@ def tariff_prediction_agent(state: CustomsAgentState) -> CustomsAgentState:
     print(f"[DEBUG] tariff_prediction_agent called with query: {state['query']}")
     
     # 세션 ID 생성 (실제로는 사용자 ID나 세션 ID를 사용)
-    session_id = "default_session"  # 실제 구현에서는 고유한 세션 ID 사용
+    session_id = DEFAULT_SESSION_ID  # 실제 구현에서는 고유한 세션 ID 사용
     
     # 워크플로우 세션 가져오기
     workflow = workflow_manager.get_session(session_id)

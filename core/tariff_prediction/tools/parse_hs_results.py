@@ -21,7 +21,7 @@ def parse_hs6_result(hs6_result: str) -> List[Dict]:
             if match:
                 rank = int(match.group(1))
                 code = match.group(2)
-                confidence = float(match.group(3)) / 100.0
+                confidence = round(float(match.group(3)) / 100.0, 3)
                 hs6_code = code[:4] + '.' + code[4:]
                 # HS6.csv에서 정보 찾기
                 hs6_row = hs6_df[hs6_df['HS코드'] == code]
@@ -29,7 +29,7 @@ def parse_hs6_result(hs6_result: str) -> List[Dict]:
                 if not hs6_row.empty:
                     search_text = str(hs6_row.iloc[0]['검색텍스트'])
                 candidates.append({
-                    'code': hs6_code,
+                    'code': code,  # 포맷팅 없이 원본 6자리 코드 사용
                     'description': f'HS코드: {code}, 설명: {search_text}',
                     'confidence': confidence,
                     'full_code': code
