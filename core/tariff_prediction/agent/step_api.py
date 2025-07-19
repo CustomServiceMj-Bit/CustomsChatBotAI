@@ -3,6 +3,7 @@ from core.tariff_prediction.dto.tariff_response import TariffPredictionResponse
 from core.tariff_prediction.tools.get_hs_classification import get_hs_classification
 from core.tariff_prediction.tools.parse_hs_results import parse_hs6_result, generate_hs10_candidates
 from core.tariff_prediction.tools.calculate_tariff_amount import calculate_tariff_amount
+from core.tariff_prediction.tools.parse_tariff_result import parse_tariff_result
 from core.shared.utils.llm import get_llm
 
 def tariff_prediction_step_api(req: TariffPredictionRequest) -> TariffPredictionResponse:
@@ -48,18 +49,27 @@ def tariff_prediction_step_api(req: TariffPredictionRequest) -> TariffPrediction
             "shipping_cost": req.shipping_cost,
             "situation": req.scenario
         })
-        if isinstance(result, str):
+        
+        # 결과를 문자열로 변환
+        result_str = str(result)
+        
+        # 에러 메시지인지 확인 (에러 메시지는 보통 짧고 특정 키워드를 포함)
+        if result_str.startswith("오류") or result_str.startswith("Error") or "실패" in result_str or "오류" in result_str:
             # 에러 메시지
             return TariffPredictionResponse(
                 step="result",
                 calculation_result=None,
-                message=result
+                message=result_str
             )
         else:
+            # 성공적인 결과 - 예쁘게 포맷팅
+            parsed_result = parse_tariff_result(result_str)
+            formatted_result = parsed_result['formatted_result']
+            
             return TariffPredictionResponse(
                 step="result",
-                calculation_result=result,
-                message="관세 계산 결과입니다."
+                calculation_result=parsed_result,  # 딕셔너리 형태로 전달
+                message=formatted_result  # 포맷팅된 결과를 message에 전달
             )
     else:
         return TariffPredictionResponse(

@@ -231,6 +231,16 @@ class TariffPredictionWorkflow:
                 enhanced_input = merge_context_with_current(context_info, current_part)
         
         parsed = self.parse_user_input(enhanced_input)
+        
+        # 상품명이 없으면 입력 전체를 상품명으로 사용
+        if 'product_name' not in parsed or not parsed['product_name']:
+            # 입력에서 불필요한 키워드 제거 후 상품명으로 사용
+            cleaned_input = user_input.strip()
+            for keyword in ['관세', '예측', '계산', '해줘', '알려줘', '어떻게', '해주세요']:
+                cleaned_input = cleaned_input.replace(keyword, '').strip()
+            if cleaned_input:
+                parsed['product_name'] = cleaned_input
+        
         # 필수 정보 확인
         missing_info = []
         if 'product_name' not in parsed or not parsed['product_name']:
@@ -452,8 +462,14 @@ class TariffPredictionWorkflow:
                 )
                 resp: TariffPredictionResponse = tariff_prediction_step_api(req)
                 self.reset_session()
-                if resp.calculation_result:
-                    response = f"# 🎯 관세 계산 결과\n{resp.calculation_result}\n\n{resp.message or ''}"
+                if resp.message and "📊 관세 계산 결과" in resp.message:
+                    # 포맷팅된 결과가 message에 있음
+                    response = resp.message
+                    self.state['responses'].append(response)
+                    return response
+                elif resp.calculation_result:
+                    # 딕셔너리 형태의 결과가 있으면 포맷팅
+                    response = resp.calculation_result.get('formatted_result', str(resp.calculation_result))
                     self.state['responses'].append(response)
                     return response
                 else:
@@ -679,13 +695,11 @@ def tariff_prediction_agent(state: CustomsAgentState) -> CustomsAgentState:
     
     # 컨텍스트가 있으면 쿼리와 결합
     if enhanced_context:
-        enhanced_query = f"이전 대화 및 LLM 응답: {enhanced_context}\n\n현재 질문: {state['query']}"
-        print(f"[DEBUG] Enhanced query with LLM context: {enhanced_query}")
+        enhanced_query = f"{enhanced_context}\n\n{state['query']}"
         response = workflow.process_user_input(enhanced_query)
     else:
         response = workflow.process_user_input(state["query"])
     
-    print(f"[DEBUG] tariff_prediction_agent response: {response}")
     
     state["final_response"] = response
     return state

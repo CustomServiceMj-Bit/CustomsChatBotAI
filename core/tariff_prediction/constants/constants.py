@@ -123,9 +123,7 @@ ERROR_MESSAGES = {
     'prediction_failed': "HS 코드 예측에 실패했습니다. 상품명을 더 구체적으로 입력해 주세요.",
     'reprediction_failed': "HS 코드 예측에 다시 실패했습니다. 상품명을 더 구체적으로 입력해 주세요.",
     'reprediction_error': "HS 코드 재예측 중 오류가 발생했습니다. 다시 시도해 주세요.",
-    'no_hs6_code': "HS6 코드가 없어 HS10 코드 예측을 다시 시도할 수 없습니다. HS6 코드부터 다시 선택해 주세요.",
-    'hs10_prediction_failed': "HS10 코드 예측에 실패했습니다. HS6 코드를 다시 선택해 주세요.",
-    'hs10_reprediction_error': "HS10 코드 재예측 중 오류가 발생했습니다. 다시 시도해 주세요.",
+
     'input_processing_error': "입력 처리 중 오류가 발생했습니다. 숫자를 입력하거나, 재예측을 원하시면 '다시', '재예측' 등으로 입력해 주세요.",
     'unknown_state': "죄송합니다. 현재 상태를 인식할 수 없습니다. 처음부터 다시 시작하겠습니다.",
     'calculation_failed': "계산 결과를 가져오지 못했습니다.",
