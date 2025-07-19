@@ -76,7 +76,7 @@ def intent_router(state: CustomsAgentState) -> CustomsAgentState:
         print(state)
         return state
     
-    # 운송장/배송 관련 키워드가 있으면 customs_tracking으로 분류
+    # 운송장/배송 관련 키워드가 있으면 customs_tracking으로 분류 (배송은 제외)
     if any(keyword in current_query_lower for keyword in CUSTOMS_TRACKING_KEYWORDS):
         state["intent"] = "customs_tracking"  # type: ignore
         state["messages"].append(AIMessage(content=f"의도 분류 완료: {state['intent']} (배송 추적 키워드 감지)"))

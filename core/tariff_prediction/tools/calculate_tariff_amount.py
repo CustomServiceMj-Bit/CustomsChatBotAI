@@ -166,12 +166,16 @@ def calculate_tariff_amount(product_code: str, value: float, origin_country: str
 
         # 관세 계산
         tax_info = calculate_tax_amount(value, item_count, shipping_cost, float(tariff_info['관세율']), krw_rate, situation)
-        
-        # 부가가치세 계산
+
+        # 부가가치세 계산 (미국 $200, 기타 $150 초과 시 무조건 부과)
         VAT = 0
-        if situation == '해외직구' and tax_info['tax_amount'] != 0:
+        # USD 환율 계산
+        total_price_krw = tax_info['total_price']
+        total_price_usd = total_price_krw / krw_rate if krw_rate else 0
+        vat_threshold = 200 if origin_country == '미국' else 150
+        if total_price_usd > vat_threshold:
             VAT = (tax_info['total_price'] + tax_info['tax_amount']) * 0.1
-        
+
         # 최종 결과
         result = {
             'HS코드': product_code,
