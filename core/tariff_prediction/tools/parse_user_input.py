@@ -3,7 +3,10 @@ import re
 from langchain_core.tools import tool
 from core.shared.utils.llm import get_llm
 import json
-from core.tariff_prediction.constants import SUPPORTED_COUNTRIES, REMOVE_KEYWORDS, PRICE_PATTERNS, QUANTITY_PATTERNS
+from core.tariff_prediction.constants import (
+    SUPPORTED_COUNTRIES, REMOVE_KEYWORDS, PRICE_PATTERNS, QUANTITY_PATTERNS,
+    LLM_PROMPT_TEMPLATES, PRODUCT_NAME_EXTRACTION
+)
 
 def parse_user_input_rule(user_input: str) -> Dict[str, Any]:
     parsed = {}
@@ -63,19 +66,14 @@ def parse_user_input_rule(user_input: str) -> Dict[str, Any]:
 
 def extract_product_name(user_input: str) -> str:
     """상품명을 추출하는 전용 함수"""
-    # 간단한 상품명 패턴 (단일 단어 또는 짧은 구문)
-    simple_patterns = [
-        r'^([가-힣a-zA-Z0-9]+)$',  # 단일 단어 (커피, 노트북 등)
-        r'^([가-힣a-zA-Z0-9\s]+)$',  # 단일 단어 + 공백
-        r'([가-힣a-zA-Z0-9]+)\s*(?:을|를|이|가|의)',  # 조사 앞의 단어
-        r'(?:이|가|을|를)\s*([가-힣a-zA-Z0-9]+)',  # 조사 뒤의 단어
-    ]
+    # 간단한 상품명 패턴 
+    simple_patterns = PRODUCT_NAME_EXTRACTION['SIMPLE_PATTERNS']
     
     for pattern in simple_patterns:
         match = re.search(pattern, user_input.strip())
         if match:
             product = match.group(1).strip()
-            if product and len(product) >= 2:  # 최소 2글자 이상
+            if product and len(product) >= PRODUCT_NAME_EXTRACTION['MIN_LENGTH']:
                 return product
     
     # 기존 방식으로 정제
@@ -89,17 +87,17 @@ def extract_product_name(user_input: str) -> str:
         cleaned = cleaned.replace(c + '에서', '')
     
     # 불필요한 키워드 제거
-    for keyword in REMOVE_KEYWORDS + ['샀어요', '구매', '예측해줘', '관세', '예측', '해줘', '어떻게', '알려줘', '계산', '해주세요']:
+    for keyword in REMOVE_KEYWORDS + PRODUCT_NAME_EXTRACTION['REMOVE_KEYWORDS_EXTENDED']:
         cleaned = cleaned.replace(keyword, '')
     
     cleaned = cleaned.strip()
     
     # 정제된 결과가 있으면 반환
-    if cleaned and len(cleaned) >= 2:
+    if cleaned and len(cleaned) >= PRODUCT_NAME_EXTRACTION['MIN_LENGTH']:
         return cleaned
     
-    # 마지막 수단: 입력 전체를 상품명으로 사용 (단, 너무 길지 않은 경우)
-    if len(user_input.strip()) <= 20 and len(user_input.strip()) >= 2:
+    # 입력 전체를 상품명으로 사용
+    if len(user_input.strip()) <= PRODUCT_NAME_EXTRACTION['MAX_LENGTH'] and len(user_input.strip()) >= PRODUCT_NAME_EXTRACTION['MIN_LENGTH']:
         return user_input.strip()
     
     return ""
@@ -114,42 +112,7 @@ def parse_user_input(user_input: str) -> Dict[str, Any]:
         if rule_result.get('product_name'):
             return rule_result
     
-    prompt = f"""
-아래는 관세 예측을 위한 사용자 입력입니다. 입력에서 다음 정보를 추출해 JSON으로 반환하세요.
-- product_name: 상품명 또는 상품 설명 (가장 중요한 정보, 반드시 추출해야 함)
-- country: 구매 국가 (예: 미국, 일본, 독일 등)
-- price: 상품 가격(원화가 아닌 경우 원래 통화 단위 그대로 유지, 숫자만)
-- price_unit: 가격 단위 (원, 달러, 엔, 위안, 유로 등)
-- quantity: 수량(숫자, 없으면 1)
-
-입력: "{user_input}"
-
-주의사항:
-1. product_name은 반드시 추출해야 합니다. 입력이 "커피"라면 product_name은 "커피"여야 합니다.
-2. 입력이 단순한 상품명만 있는 경우에도 product_name을 추출하세요.
-3. 가격이나 국가 정보가 없어도 상품명은 반드시 추출하세요.
-
-반환 예시:
-{{
-  "product_name": "커피",
-  "country": null,
-  "price": null,
-  "price_unit": null,
-  "quantity": 1
-}}
-
-또는
-
-{{
-  "product_name": "노트북",
-  "country": "미국",
-  "price": 150,
-  "price_unit": "달러",
-  "quantity": 1
-}}
-
-반드시 위와 같은 JSON만 반환하세요.
-"""
+    prompt = LLM_PROMPT_TEMPLATES['parse_user_input'].format(user_input=user_input)
     try:
         llm = get_llm()
         response = llm.invoke([{"role": "user", "content": prompt}])

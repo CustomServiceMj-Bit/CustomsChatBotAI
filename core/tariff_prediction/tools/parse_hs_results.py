@@ -6,7 +6,7 @@ from langchain_core.tools import tool
 
 @tool
 def parse_hs6_result(hs6_result: str) -> List[Dict]:
-    """HS6 결과를 파싱합니다. (HS6.csv에서 검색텍스트도 함께 반환)"""
+    """HS6 결과를 파싱합니다."""
     candidates = []
     # HS6.csv 파일 로드
     data_dir = os.path.join(os.path.dirname(__file__), '..', 'data')

@@ -2,6 +2,7 @@ import pandas as pd
 import os
 from langchain_core.tools import tool
 from core.tariff_prediction.tools.get_exchange_rate_info import get_exchange_rate_api
+from core.tariff_prediction.constants import COUNTRY_GROUPS, VAT_THRESHOLDS, TARIFF_CALCULATION
 
 def find_unit(country: str, df) -> str:
     """국가별 통화 단위를 찾습니다. df는 pandas DataFrame이어야 합니다."""
@@ -34,17 +35,9 @@ def get_tariff_info(hs_code: str, input_country: str, full_tariff_df) -> dict:
             full_tariff_df = pd.DataFrame(full_tariff_df)
     if 'number' not in full_tariff_df.columns or 'country' not in full_tariff_df.columns:
         return {'오류': '관세 데이터 형식 오류'}
-    EFTA_COUNTRIES = ['스위스', '리히텐슈타인', '아이슬란드', '노르웨이']
-    ASEAN_COUNTRIES = [
-        '브루나이', '캄보디아', '인도네시아', '라오스', '말레이시아', 
-        '미얀마', '필리핀', '싱가포르', '태국', '베트남'
-    ]
-    EU_COUNTRIES = [
-        '오스트리아', '벨기에', '불가리아', '크로아티아', '키프로스', '체코', '덴마크',
-        '에스토니아', '핀란드', '프랑스', '독일', '그리스', '헝가리', '아일랜드',
-        '이탈리아', '라트비아', '리투아니아', '룩셈부르크', '몰타', '네덜란드',
-        '폴란드', '포르투갈', '루마니아', '슬로바키아', '슬로베니아', '스페인', '스웨덴'
-    ]
+    EFTA_COUNTRIES = COUNTRY_GROUPS['EFTA_COUNTRIES']
+    ASEAN_COUNTRIES = COUNTRY_GROUPS['ASEAN_COUNTRIES']
+    EU_COUNTRIES = COUNTRY_GROUPS['EU_COUNTRIES']
 
     # 1. HS코드로 전체 데이터프레임에서 관련 규칙을 먼저 필터링합니다.
     if isinstance(full_tariff_df, pd.DataFrame):
@@ -103,10 +96,10 @@ def calculate_tax_amount(item_price: float, item_count: int, shipping_cost: floa
     total_price = item_price * item_count + shipping_cost
 
     # 2) 시나리오별 과세 예외
-    # 2-1) personal 해외 여행 휴대품 – 600USD 면세
+    # 2-1) personal 해외 여행 휴대품 – 면세 한도 적용
     if situation == '해외체류 중 구매':
         total_price_usd = total_price / usd_rate
-        if total_price_usd <= 600:
+        if total_price_usd <= TARIFF_CALCULATION['PERSONAL_EXEMPTION_LIMIT']:
             return {           # 전액 면세
                 'total_price'     : total_price,
                 'tax_amount'      : 0,
@@ -151,7 +144,7 @@ def calculate_tariff_amount(product_code: str, value: float, origin_country: str
         
         # 환율 조회
         if not origin_country or origin_country.strip() == "":
-            origin_country = "미국"  # 기본값으로 미국 설정
+            origin_country = TARIFF_CALCULATION['DEFAULT_COUNTRY']  # 기본값으로 미국 설정
         
         cur_unit = find_unit(origin_country, currency_df)
         if cur_unit is None:
@@ -162,7 +155,7 @@ def calculate_tariff_amount(product_code: str, value: float, origin_country: str
         else:
             krw_rate = get_exchange_rate_api(cur_unit, situation)
             if krw_rate is None:
-                krw_rate = 1300.0
+                krw_rate = TARIFF_CALCULATION['DEFAULT_USD_RATE']
 
         # 관세 계산
         tax_info = calculate_tax_amount(value, item_count, shipping_cost, float(tariff_info['관세율']), krw_rate, situation)
@@ -172,9 +165,9 @@ def calculate_tariff_amount(product_code: str, value: float, origin_country: str
         # USD 환율 계산
         total_price_krw = tax_info['total_price']
         total_price_usd = total_price_krw / krw_rate if krw_rate else 0
-        vat_threshold = 200 if origin_country == '미국' else 150
+        vat_threshold = VAT_THRESHOLDS['US_THRESHOLD'] if origin_country == '미국' else VAT_THRESHOLDS['OTHER_THRESHOLD']
         if total_price_usd > vat_threshold:
-            VAT = (tax_info['total_price'] + tax_info['tax_amount']) * 0.1
+            VAT = (tax_info['total_price'] + tax_info['tax_amount']) * VAT_THRESHOLDS['VAT_RATE']
 
         # 최종 결과
         result = {
