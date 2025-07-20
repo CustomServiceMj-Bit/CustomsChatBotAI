@@ -6,6 +6,8 @@ from core.shared.states.states import CustomsAgentState
 from core.shared.utils.llm import get_llm
 from core.shared.constants import (
     TARIFF_SESSION_KEYWORDS,
+    TARIFF_PREDICTION_KEYWORDS,
+    CUSTOMS_TRACKING_KEYWORDS,
     NUMBER_SELECTION_PATTERNS,
     QUESTION_PATTERNS,
     INTENT_CLASSIFICATION_PROMPT,
@@ -23,6 +25,23 @@ def _is_number_selection(query: str) -> bool:
 def _is_question(query: str) -> bool:
     """질문 형태인지 확인합니다."""
     return any(re.search(pattern, query) for pattern in QUESTION_PATTERNS)
+
+
+def _classify_by_keywords(query: str) -> Optional[str]:
+    """키워드 기반으로 의도를 분류합니다."""
+    query_lower = query.lower()
+    
+    # 배송 추적 관련 키워드 확인
+    tracking_keywords = [kw for kw in CUSTOMS_TRACKING_KEYWORDS if kw in query_lower]
+    if tracking_keywords:
+        return "customs_tracking"
+    
+    # 관세 예측 관련 키워드 확인
+    tariff_keywords = [kw for kw in TARIFF_PREDICTION_KEYWORDS if kw in query_lower]
+    if tariff_keywords:
+        return "tariff_prediction"
+    
+    return None
 
 
 def _is_in_tariff_session(state: CustomsAgentState) -> bool:
@@ -102,6 +121,13 @@ def intent_router(state: CustomsAgentState) -> CustomsAgentState:
     if is_question:
         state["intent"] = "qna"
         _add_classification_message(state, "qna", "질문 형태 감지")
+        return state
+    
+    # 키워드 기반 분류
+    keyword_intent = _classify_by_keywords(current_query)
+    if keyword_intent:
+        state["intent"] = keyword_intent
+        _add_classification_message(state, keyword_intent, "키워드 기반 분류")
         return state
     
     # 숫자 선택이지만 관세 예측 세션이 아닌 경우에도 tariff_prediction으로 분류
