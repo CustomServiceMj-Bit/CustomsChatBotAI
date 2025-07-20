@@ -82,7 +82,6 @@ def parse_tariff_result(tariff_result: str) -> Dict[str, Any]:
 | **원산지** | {parsed['origin_country']} |
 | **상품 가격** | {formatted_price} |
 | **수량** | {parsed['quantity']}개 |
-| **배송비** | {formatted_shipping} |
 
 ### 💰 세금 정보
 | 항목 | 금액 |

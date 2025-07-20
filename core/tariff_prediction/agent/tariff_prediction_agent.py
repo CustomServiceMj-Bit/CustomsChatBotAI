@@ -51,7 +51,9 @@ class TariffPredictionWorkflow:
             'hs10_code': None,
             'current_step': 'scenario_selection',
             'session_active': False,
-            'responses': []
+            'responses': [],
+            'predicted_scenario': None, # 예측된 시나리오 저장
+            'last_user_input': None # 마지막 사용자 입력 저장
         }
         
         # 환율 지원 국가 목록
@@ -72,7 +74,9 @@ class TariffPredictionWorkflow:
             'hs10_code': None,
             'current_step': 'scenario_selection',
             'session_active': False,
-            'responses': []
+            'responses': [],
+            'predicted_scenario': None,
+            'last_user_input': None
         }
 
     def is_supported_country(self, country: str) -> bool:
@@ -177,6 +181,7 @@ class TariffPredictionWorkflow:
             response = (
                 "구매하신 상품 정보를 입력해 주세요!\n\n"
                 "💡 **상품 묘사의 정확도가 높을수록 정확한 관세 예측이 가능합니다!**\n\n"
+                "💡 **가격은 배송비를 제외하고 입력해 주세요!**\n\n"
                 "예시:\n"
                 "• \"아랫창은 고무로 되어있고 하얀색 운동화를 80000원에 독일에서 샀어요\"\n"
                 "• \"인텔 i7 노트북을 150만원에 미국에서 구매했어요\"\n"
@@ -194,6 +199,7 @@ class TariffPredictionWorkflow:
             response = (
                 "구매하신 상품 정보를 입력해 주세요!\n\n"
                 "💡 **상품 묘사의 정확도가 높을수록 정확한 관세 예측이 가능합니다!**\n\n"
+                "💡 **가격은 배송비를 제외하고 입력해 주세요!**\n\n"
                 "예시:\n"
                 "• \"아랫창은 고무로 되어있고 하얀색 운동화를 80000원에 독일에서 샀어요\"\n"
                 "• \"인텔 i7 노트북을 150만원에 미국에서 구매했어요\"\n"
@@ -213,33 +219,35 @@ class TariffPredictionWorkflow:
         self.state['responses'].append(response)
         return response
 
+    def josa_으로(self, word: str) -> str:
+        if not word:
+            return ""
+        last_char = word[-1]
+        if (ord(last_char) - 44032) % 28 == 0:
+            return word + "로"
+        else:
+            return word + "으로"
+
     def handle_input_collection(self, user_input: str) -> str:
-        # 컨텍스트에서 추가 정보 추출 시도
+        # 최초 진입: 시나리오 예측
+        if not self.state.get('scenario'):
+            predicted = self.detect_scenario_from_input(user_input)
+            if predicted:
+                self.state['scenario'] = predicted
         enhanced_input = user_input
-        
-        # 이전 대화에서 상품 정보가 누락된 경우 컨텍스트에서 찾기
         if "이전 대화:" in user_input:
             context_part = user_input.split("현재 질문:")[0].replace("이전 대화:", "").strip()
             current_part = user_input.split("현재 질문:")[1].strip() if "현재 질문:" in user_input else user_input
-            
-            # 컨텍스트에서 상품 정보 추출 시도
             context_info = extract_info_from_context(context_part)
             if context_info:
-                # 현재 입력에 누락된 정보를 컨텍스트에서 보완
                 enhanced_input = merge_context_with_current(context_info, current_part)
-        
         parsed = self.parse_user_input(enhanced_input)
-        
-        # 상품명이 없으면 입력 전체를 상품명으로 사용
         if 'product_name' not in parsed or not parsed['product_name']:
-            # 입력에서 불필요한 키워드 제거 후 상품명으로 사용
             cleaned_input = user_input.strip()
             for keyword in ['관세', '예측', '계산', '해줘', '알려줘', '어떻게', '해주세요']:
                 cleaned_input = cleaned_input.replace(keyword, '').strip()
             if cleaned_input:
                 parsed['product_name'] = cleaned_input
-        
-        # 필수 정보 확인
         missing_info = []
         if 'product_name' not in parsed or not parsed['product_name']:
             missing_info.append("상품명")
@@ -248,7 +256,6 @@ class TariffPredictionWorkflow:
         if 'price' not in parsed or not parsed['price']:
             missing_info.append("상품 가격")
         if missing_info:
-            # 이미 입력된 정보는 보여주고, 누락된 정보만 안내
             info_lines = []
             if 'product_name' in parsed and parsed['product_name']:
                 info_lines.append(f"상품명: {parsed['product_name']}")
@@ -272,11 +279,8 @@ class TariffPredictionWorkflow:
             )
             self.state['responses'].append(response)
             return response
-        # 환율 변환 처리
         price = parsed['price']
         price_unit = parsed.get('price_unit', '원')
-        
-        # 원화가 아닌 경우 환율 변환
         if price_unit != '원':
             try:
                 from core.tariff_prediction.tools.get_exchange_rate_info import get_exchange_rate_api
@@ -285,23 +289,16 @@ class TariffPredictionWorkflow:
                     price = price * exchange_rate
                     price_unit = '원'
                 else:
-                    # 환율 조회 실패 시 기본 환율 사용
                     if price_unit in DEFAULT_EXCHANGE_RATES:
                         price = price * DEFAULT_EXCHANGE_RATES[price_unit]
                         price_unit = '원'
-            except Exception as e:
-                print(f"[DEBUG] 환율 변환 오류: {e}")
-                # 오류 시 기본 환율 사용
+            except Exception:
                 if price_unit in DEFAULT_EXCHANGE_RATES:
                     price = price * DEFAULT_EXCHANGE_RATES[price_unit]
                     price_unit = '원'
-        
-        # 상태 업데이트
         self.state.update(parsed)
         self.state['price'] = price
         self.state['price_unit'] = price_unit
-        
-        # step_api.py 활용
         req = TariffPredictionRequest(
             step="input",
             product_description=parsed['product_name'],
@@ -318,15 +315,12 @@ class TariffPredictionWorkflow:
         self.state['hs6_candidates'] = resp.hs6_candidates
         self.state['current_step'] = 'hs6_selection'
         scenario_str = self.state.get('scenario', '')
-        scenario_guide = f"{scenario_str}로 예상하고 안내를 도와드릴게요.\n\n" if scenario_str else ""
-        
-        # 가격 표시 (원화 변환된 경우)
+        scenario_guide = f"{self.josa_으로(scenario_str)} 예상하고 안내를 도와드릴게요.\n\n" if scenario_str else ""
         price_display = f"{price:,.0f}원"
         if price_unit != '원' and parsed.get('price_unit') != '원':
             original_price = parsed.get('price', price)
             original_unit = parsed.get('price_unit', price_unit)
             price_display = f"{original_price} {original_unit} (약 {price:,.0f}원)"
-        
         response = scenario_guide + f"상품묘사: {parsed['product_name']}\n국가: {parsed['country']}\n가격: {price_display}\n수량: {parsed.get('quantity', 1)}개\n\nHS 코드 예측 모델로부터 HS6 코드 후보를 찾았습니다. 번호를 선택해 주세요:\n" + '\n'.join([
                             f"{i+1}. {c['description']} (신뢰도: {c['confidence']:.1%})" for i, c in enumerate(resp.hs6_candidates or [])
         ]) + f"\n\n💡 **위 후보 중 하나를 선택해 주세요.**\n예시: \"1번\", \"2번\", \"3번\" 등"
@@ -415,8 +409,7 @@ class TariffPredictionWorkflow:
                     self.state['responses'].append(response)
                     return response
                     
-            except Exception as e:
-                print(f"[DEBUG] handle_hs6_selection intent detection error: {e}")
+            except Exception:
                 # 예외 발생 시 안내 메시지로 graceful 처리
                 response = f"입력 처리 중 오류가 발생했습니다. 숫자를 입력하거나, 재예측을 원하시면 '다시', '재예측' 등으로 입력해 주세요."
                 self.state['responses'].append(response)
@@ -487,44 +480,22 @@ class TariffPredictionWorkflow:
 
 
     def _perform_hs6_reprediction(self, user_input: str) -> str:
-        """HS6 코드 재예측을 수행합니다."""
         from core.tariff_prediction.tools.parse_hs_results import parse_hs6_result
         from core.shared.utils.llm import get_llm
-        
         product_name = self.state.get('product_name')
         if not product_name or not isinstance(product_name, str) or not product_name.strip():
             response = "상품명을 알 수 없어 HS 코드 예측을 다시 시도할 수 없습니다. 처음부터 다시 입력해 주세요."
             self.state['responses'].append(response)
             return response
-        
         try:
-            # 재예측을 위한 명확한 프롬프트
-            reprediction_prompt = f"""아래 상품명과 사용자의 추가 의견을 참고하여 HS 코드 후보를 예측해주세요.
-
-상품명: {product_name}
-사용자 추가 의견: {user_input}
-
-다음 형식으로 HS 코드 후보 3개 이내를 반환하세요:
-1. [6자리 HS코드] (확률: [확률]%)
-2. [6자리 HS코드] (확률: [확률]%)
-3. [6자리 HS코드] (확률: [확률]%)
-
-예시:
-1. 851770 (확률: 85.5%)
-2. 851712 (확률: 12.3%)
-3. 851713 (확률: 2.2%)"""
-
+            reprediction_prompt = f"""아래 상품명과 사용자의 추가 의견을 참고하여 HS 코드 후보를 예측해주세요.\n\n상품명: {product_name}\n사용자 추가 의견: {user_input}\n\n다음 형식으로 HS 코드 후보 3개 이내를 반환하세요:\n1. [6자리 HS코드] (확률: [확률]%)\n2. [6자리 HS코드] (확률: [확률]%)\n3. [6자리 HS코드] (확률: [확률]%)\n\n예시:\n1. 851770 (확률: 85.5%)\n2. 851712 (확률: 12.3%)\n3. 851713 (확률: 2.2%)"""
             llm = get_llm()
             hs6_response = llm.invoke([{"role": "user", "content": reprediction_prompt}])
             hs6_result = extract_llm_response(hs6_response)
-            
-            # LLM 응답이 비어있거나 잘못된 경우 처리
             if not hs6_result or len(hs6_result.strip()) < 10:
                 response = "HS 코드 예측에 실패했습니다. 상품명을 더 구체적으로 입력해 주세요."
                 self.state['responses'].append(response)
                 return response
-            
-            # parse_hs6_result 함수 호출 시 예외 처리
             try:
                 hs6_candidates = parse_hs6_result(hs6_result)
             except Exception as parse_error:
@@ -532,23 +503,18 @@ class TariffPredictionWorkflow:
                 response = "HS 코드 예측 결과를 처리하는 중 오류가 발생했습니다. 다시 시도해 주세요."
                 self.state['responses'].append(response)
                 return response
-            
             if not hs6_candidates:
                 response = "HS 코드 예측에 다시 실패했습니다. 상품명을 더 구체적으로 입력해 주세요."
                 self.state['responses'].append(response)
                 return response
-            
             self.state['hs6_candidates'] = hs6_candidates
             scenario_str = self.state.get('scenario', '')
-            scenario_guide = f"{scenario_str}로 예상하고 안내를 도와드릴게요.\n\n" if scenario_str else ""
-            
+            scenario_guide = f"{self.josa_으로(scenario_str)} 예상하고 안내를 도와드릴게요.\n\n" if scenario_str else ""
             response = scenario_guide + f"상품묘사: {product_name}\n국가: {self.state.get('country','')}\n가격: {self.state.get('price',0):,}원\n수량: {self.state.get('quantity',1)}개\n\nHS 코드 재예측 결과입니다. 번호를 선택해 주세요:\n" + '\n'.join([
                 f"{i+1}. {c['description']} (신뢰도: {c['confidence']:.1%})" for i, c in enumerate(hs6_candidates)
             ]) + f"\n\n💡 **위 후보 중 하나를 선택해 주세요.**\n예시: \"1번\", \"2번\", \"3번\" 등"
-            
             self.state['responses'].append(response)
             return response
-            
         except Exception as e:
             print(f"[DEBUG] _perform_hs6_reprediction error: {e}")
             response = "HS 코드 재예측 중 오류가 발생했습니다. 다시 시도해 주세요."
