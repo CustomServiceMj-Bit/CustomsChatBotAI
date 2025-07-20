@@ -35,7 +35,6 @@ def parse_tariff_result(tariff_result: str) -> Dict[str, Any]:
         
         # 가격 포맷팅
         formatted_price = format_price(parsed['product_price'])
-        formatted_shipping = format_price(parsed['shipping_cost'])
         formatted_tariff = format_price(parsed['tariff_amount'])
         formatted_vat = format_price(parsed['vat_amount'])
         formatted_total = format_price(parsed['total_tax'])

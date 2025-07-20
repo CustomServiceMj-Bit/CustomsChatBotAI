@@ -6,9 +6,11 @@ from core.shared.utils.llm import get_llm
 from core.shared.constants import (
     TARIFF_SESSION_KEYWORDS,
     NUMBER_SELECTION_PATTERNS,
+    QUESTION_PATTERNS,
     INTENT_CLASSIFICATION_PROMPT,
     INTENT_TYPES,
-    DEFAULT_INTENT
+    DEFAULT_INTENT,
+    SESSION_CHECK_MESSAGE_COUNT
 )
 
 def intent_router(state: CustomsAgentState) -> CustomsAgentState:
@@ -24,6 +26,9 @@ def intent_router(state: CustomsAgentState) -> CustomsAgentState:
             is_number_selection = True
             break
     
+    # 질문 형태 감지
+    is_question = any(re.search(pattern, current_query) for pattern in QUESTION_PATTERNS)
+    
     # 이전 대화에서 관세 예측 중인지 확인
     messages = state.get("messages", [])
     is_in_tariff_session = False
@@ -33,7 +38,7 @@ def intent_router(state: CustomsAgentState) -> CustomsAgentState:
         is_in_tariff_session = True
     
     # 2. 최근 메시지들을 확인하여 관세 예측 세션 중인지 판단
-    for msg in messages[-5:]:  # 최근 5개 메시지 확인
+    for msg in messages[-SESSION_CHECK_MESSAGE_COUNT:]:  # 최근 메시지 확인
         if hasattr(msg, 'content') and isinstance(msg.content, str):
             content = msg.content.lower()
             # 관세 예측 관련 키워드가 있거나 HS 코드 선택 메시지가 있으면 관세 예측 세션으로 판단
@@ -45,14 +50,19 @@ def intent_router(state: CustomsAgentState) -> CustomsAgentState:
     if messages and len(messages) > 0:
         last_msg = messages[-1]
         if hasattr(last_msg, 'content') and isinstance(last_msg.content, str):
-            if 'tariff_prediction' in last_msg.content:
+            if 'tariff_prediction' in last_msg.content or '관세 예측 세션' in last_msg.content:
                 is_in_tariff_session = True
     
     # 관세 예측 세션 중이면 무조건 tariff_prediction으로 분류
     if is_in_tariff_session:
         state["intent"] = "tariff_prediction"  # type: ignore
         state["messages"].append(AIMessage(content=f"의도 분류 완료: {state['intent']} (관세 예측 세션 연속성 유지)"))
-        print(state)
+        return state
+    
+    # 질문 형태이면서 관세 예측 세션이 아닌 경우 QnA로 분류
+    if is_question and not is_in_tariff_session:
+        state["intent"] = "qna"  # type: ignore
+        state["messages"].append(AIMessage(content=f"의도 분류 완료: {state['intent']} (질문 형태 감지)"))
         return state
     
     # 숫자 선택이지만 관세 예측 세션이 아닌 경우에도 tariff_prediction으로 분류
@@ -60,7 +70,6 @@ def intent_router(state: CustomsAgentState) -> CustomsAgentState:
     if is_number_selection:
         state["intent"] = "tariff_prediction"  # type: ignore
         state["messages"].append(AIMessage(content=f"의도 분류 완료: {state['intent']} (숫자 선택 감지)"))
-        print(state)
         return state
     
     # LLM 기반 의도 분류를 수행
@@ -75,10 +84,9 @@ def intent_router(state: CustomsAgentState) -> CustomsAgentState:
         if intent not in INTENT_TYPES:
             intent = DEFAULT_INTENT  # 기본값을 tariff_prediction으로 변경
     except Exception as e:
-        print(f"[DEBUG] LLM 분류 오류: {e}")
+        # LLM 분류 실패 시 기본값 사용
         intent = DEFAULT_INTENT  # 오류 시에도 tariff_prediction으로 분류
     
     state["intent"] = intent  # type: ignore
     state["messages"].append(AIMessage(content=f"의도 분류 완료: {intent} (LLM 분류)"))
-    print(state)
     return state
