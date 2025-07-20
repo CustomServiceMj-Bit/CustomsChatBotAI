@@ -1,5 +1,6 @@
 from typing import Dict, Any
 from langchain_core.tools import tool
+from core.tariff_prediction.constants import TARIFF_RESULT_PARSING
 
 def format_price(price_str: str) -> str:
     """가격을 깔끔하게 포맷팅합니다."""
@@ -19,51 +20,18 @@ def format_price(price_str: str) -> str:
 @tool
 def parse_tariff_result(tariff_result: str) -> Dict[str, Any]:
     """관세 계산 결과를 파싱하고 포맷팅합니다."""
-    parsed = {
-        'hs_code': '',
-        'origin_country': '',
-        'product_price': '',
-        'quantity': '',
-        'shipping_cost': '',
-        'tariff_rate': '0%',
-        'tariff_amount': '0원',
-        'vat_amount': '0원',
-        'total_tax': '0원',
-        'tariff_rule': '',
-        'fta_applied': 'No',
-        'note': '',
-        'formatted_result': tariff_result
-    }
+    parsed = TARIFF_RESULT_PARSING['DEFAULT_VALUES'].copy()
+    parsed['formatted_result'] = tariff_result
     
     try:
         # 결과에서 주요 정보 추출
         lines = tariff_result.split('\n')
         for line in lines:
             line = line.strip()
-            if 'HS코드:' in line:
-                parsed['hs_code'] = line.split(':')[-1].strip()
-            elif '원산지:' in line:
-                parsed['origin_country'] = line.split(':')[-1].strip()
-            elif '상품가격:' in line:
-                parsed['product_price'] = line.split(':')[-1].strip()
-            elif '수량:' in line:
-                parsed['quantity'] = line.split(':')[-1].strip()
-            elif '배송비:' in line:
-                parsed['shipping_cost'] = line.split(':')[-1].strip()
-            elif '관세율:' in line:
-                parsed['tariff_rate'] = line.split(':')[-1].strip()
-            elif '관세금액:' in line:
-                parsed['tariff_amount'] = line.split(':')[-1].strip()
-            elif '부가가치세:' in line:
-                parsed['vat_amount'] = line.split(':')[-1].strip()
-            elif '총 세금:' in line:
-                parsed['total_tax'] = line.split(':')[-1].strip()
-            elif '적용 관세 규칙:' in line:
-                parsed['tariff_rule'] = line.split(':')[-1].strip()
-            elif 'FTA 적용:' in line:
-                parsed['fta_applied'] = line.split(':')[-1].strip()
-            elif '비고:' in line:
-                parsed['note'] = line.split(':')[-1].strip()
+            for field_key, field_name in TARIFF_RESULT_PARSING['FIELD_MAPPINGS'].items():
+                if field_key in line:
+                    parsed[field_name] = line.split(':')[-1].strip()
+                    break
         
         # 가격 포맷팅
         formatted_price = format_price(parsed['product_price'])
@@ -105,7 +73,7 @@ def parse_tariff_result(tariff_result: str) -> Dict[str, Any]:
         parsed['formatted_result'] = formatted_result
         
     except Exception as e:
-        # 파싱 실패 시 원본 결과를 예쁘게 포맷팅
+        # 파싱 실패 시 원본 결과를 포맷팅
         formatted_result = f"""## 📊 관세 계산 결과
 
 ```
