@@ -264,7 +264,7 @@ class TariffPredictionWorkflow:
             price_display = f"{original_price} {original_unit} ({price:,.0f}원)"
         response = scenario_guide + f"상품묘사: {parsed['product_name']}\n국가: {parsed['country']}\n가격: {price_display}\n수량: {parsed.get('quantity', 1)}개\n\n{RESPONSE_MESSAGES['hs6_code_prediction_prompt']}\n" + '\n'.join([
                             f"{i+1}. {c['description']} ({RESPONSE_MESSAGES['hs6_confidence']} {c['confidence']:.1%})" for i, c in enumerate(resp.hs6_candidates or [])
-        ]) + f"\n\n{RESPONSE_MESSAGES['hs6_code_selection_prompt']}\n예시: \"1번\", \"2번\", \"3번\" 등"
+        ]) + f"\n\n{self.format_selection_guide('hs6_code_selection_prompt')}"
         self.state['responses'].append(response)
         return response
 
@@ -278,6 +278,14 @@ class TariffPredictionWorkflow:
         for i, candidate in enumerate(self.state['hs6_candidates'], 1):
             formatted += f"{i}. {candidate['code']} - {candidate['description']} ({RESPONSE_MESSAGES['hs6_confidence']} {candidate['confidence']:.1%})\n"
         return formatted
+
+    def format_selection_guide(self, selection_prompt_key: str) -> str:
+        """번호 선택 안내 + 예시 + 재예측 안내를 포맷팅합니다."""
+        return (
+            f"{RESPONSE_MESSAGES[selection_prompt_key]}\n"
+            f"{RESPONSE_MESSAGES['number_example']}\n"
+            f"{RESPONSE_MESSAGES['reprediction_guide']}"
+        )
 
     def handle_hs6_selection(self, user_input: str) -> str:
         from core.tariff_prediction.tools.parse_hs_results import parse_hs6_result
@@ -303,11 +311,11 @@ class TariffPredictionWorkflow:
                 self.state['current_step'] = STEPS['hs10_selection']
                 response = f"{RESPONSE_MESSAGES['hs6_code_selected']} {selected['code']}\n\n{RESPONSE_MESSAGES['hs10_code_prediction_prompt']}\n" + '\n'.join([
                     f"{i+1}. {c['code']} - {c['description']}" for i, c in enumerate(resp.hs10_candidates or [])
-                ]) + f"\n\n{RESPONSE_MESSAGES['hs10_code_selection_prompt']}\n예시: \"1번\", \"2번\", \"3번\" 등"
+                ]) + f"\n\n{self.format_selection_guide('hs10_code_selection_prompt')}"
                 self.state['responses'].append(response)
                 return response
             else:
-                response = f"{RESPONSE_MESSAGES['invalid_number']}\n\n{RESPONSE_MESSAGES['hs6_code_selection_prompt']}\n예시: \"1번\", \"2번\", \"3번\" 등"
+                response = self.format_selection_guide('hs6_code_selection_prompt')
                 self.state['responses'].append(response)
                 return response
         else:
@@ -323,12 +331,12 @@ class TariffPredictionWorkflow:
                 if answer.lower() in ["네", "yes", "true", "1"]:
                     return self._perform_hs6_reprediction(user_input)
                 else:
-                    response = f"{RESPONSE_MESSAGES['hs6_code_selection_prompt']}\n예시: \"1번\", \"2번\", \"3번\" 등\n\n{RESPONSE_MESSAGES['hs6_code_reprediction_hint']}"
+                    response = self.format_selection_guide('hs6_code_selection_prompt')
                     self.state['responses'].append(response)
                     return response
                     
             except Exception:
-                response = f"{RESPONSE_MESSAGES['input_processing_error']}\n{RESPONSE_MESSAGES['hs6_code_selection_prompt']}\n예시: \"1번\", \"2번\", \"3번\" 등"
+                response = f"{RESPONSE_MESSAGES['input_processing_error']}\n{self.format_selection_guide('hs6_code_selection_prompt')}"
                 self.state['responses'].append(response)
                 return response
 

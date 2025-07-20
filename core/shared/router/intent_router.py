@@ -120,7 +120,7 @@ def intent_router(state: CustomsAgentState) -> CustomsAgentState:
     # 질문 형태이면서 관세 예측 세션이 아닌 경우 QnA로 분류
     if is_question:
         state["intent"] = "qna"
-        _add_classification_message(state, "qna", "질문 형태 감지")
+        _add_classification_message(state, "qna", "질문 형태 감지(우선)")
         return state
     
     # 키워드 기반 분류
