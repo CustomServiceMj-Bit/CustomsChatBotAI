@@ -1,6 +1,7 @@
 from langchain_core.messages import SystemMessage, AIMessage
 import re
 from typing import List, Optional
+import uuid
 
 from core.shared.states.states import CustomsAgentState
 from core.shared.utils.llm import get_llm
@@ -89,57 +90,76 @@ def _classify_with_llm(query: str) -> str:
 
 
 def _add_classification_message(state: CustomsAgentState, intent: str, reason: str) -> None:
-    """의도 분류 완료 메시지를 추가합니다."""
-    state["messages"].append(
-        AIMessage(content=f"의도 분류 완료: {intent} ({reason})")
-    )
+    # 의도 분류 메시지를 messages에 남기지 않음
+    pass
 
 
 def intent_router(state: CustomsAgentState) -> CustomsAgentState:
-    """사용자 쿼리의 의도를 분류합니다."""
-    
+    prev_intent = state.get("intent")
     current_query = state["query"].strip()
     if not current_query:
         state["intent"] = DEFAULT_INTENT
         _add_classification_message(state, DEFAULT_INTENT, "빈 쿼리")
         return state
-    
     # 세션 연속성 확인
     is_in_tariff_session = _is_in_tariff_session(state)
-    
     # 관세 예측 세션 중이면 무조건 tariff_prediction으로 분류
     if is_in_tariff_session:
         state["intent"] = "tariff_prediction"
         _add_classification_message(state, "tariff_prediction", "관세 예측 세션 연속성 유지")
+        if not state.get("session_id") or state.get("session_id") in [None, '']:
+            state["session_id"] = str(uuid.uuid4())
         return state
-    
     # 패턴 기반 분류
     is_number_selection = _is_number_selection(current_query)
     is_question = _is_question(current_query)
-    
     # 질문 형태이면서 관세 예측 세션이 아닌 경우 QnA로 분류
     if is_question:
         state["intent"] = "qna"
         _add_classification_message(state, "qna", "질문 형태 감지(우선)")
+        if prev_intent == "tariff_prediction" and state.get("session_id"):
+            try:
+                from core.tariff_prediction.agent.tariff_prediction_agent import workflow_manager
+                workflow_manager.cleanup_session(state["session_id"])
+            except Exception:
+                pass
+        state["session_id"] = None
         return state
-    
     # 키워드 기반 분류
     keyword_intent = _classify_by_keywords(current_query)
     if keyword_intent:
         state["intent"] = keyword_intent
         _add_classification_message(state, keyword_intent, "키워드 기반 분류")
+        if prev_intent == "tariff_prediction" and keyword_intent != "tariff_prediction" and state.get("session_id"):
+            try:
+                from core.tariff_prediction.agent.tariff_prediction_agent import workflow_manager
+                workflow_manager.cleanup_session(state["session_id"])
+            except Exception:
+                pass
+        if keyword_intent == "tariff_prediction":
+            if not state.get("session_id") or state.get("session_id") in [None, '']:
+                state["session_id"] = str(uuid.uuid4())
+        else:
+            state["session_id"] = None
         return state
-    
-    # 숫자 선택이지만 관세 예측 세션이 아닌 경우에도 tariff_prediction으로 분류
-    # (HS 코드 직접 입력 등의 경우)
     if is_number_selection:
         state["intent"] = "tariff_prediction"
         _add_classification_message(state, "tariff_prediction", "숫자 선택 감지")
+        if not state.get("session_id") or state.get("session_id") in [None, '']:
+            state["session_id"] = str(uuid.uuid4())
         return state
-    
-    # LLM 기반 의도 분류를 수행
     intent = _classify_with_llm(current_query)
     state["intent"] = intent
     _add_classification_message(state, intent, "LLM 분류")
-    
+    if prev_intent == "tariff_prediction" and intent != "tariff_prediction" and state.get("session_id"):
+        try:
+            from core.tariff_prediction.agent.tariff_prediction_agent import workflow_manager
+            workflow_manager.cleanup_session(state["session_id"])
+        except Exception:
+            pass
+    if intent == "tariff_prediction":
+        if not state.get("session_id") or state.get("session_id") in [None, '']:
+            state["session_id"] = str(uuid.uuid4())
+    else:
+        state["session_id"] = None
     return state

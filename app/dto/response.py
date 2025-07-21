@@ -10,6 +10,7 @@ class Response(BaseModel):
     success: Optional[bool] = None
     progress_details: Optional[List[ProgressDetail]] = None
     error_reason: Optional[str] = None
+    session_id: Optional[str] = None
 
     @staticmethod
     def cargo_progres_result_to_response(result: CargoProgressResult) -> "Response":

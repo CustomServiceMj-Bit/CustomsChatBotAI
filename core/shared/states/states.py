@@ -16,3 +16,4 @@ class CustomsAgentState(TypedDict):
     intermediate_results: Dict[str, Any]
     progress_details: Optional[List[ProgressDetail]]
     error_reason: Optional[str]
+    session_id: Optional[str]  # 세션 ID 추가

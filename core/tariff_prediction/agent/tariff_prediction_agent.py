@@ -23,19 +23,14 @@ from core.tariff_prediction.dto.tariff_response import TariffPredictionResponse
 class WorkflowManager:
     def __init__(self):
         self.sessions = {}
-    
     def get_session(self, session_id: str) -> 'TariffPredictionWorkflow':
-        """세션을 가져오거나 새로 생성합니다."""
         if session_id not in self.sessions:
             self.sessions[session_id] = TariffPredictionWorkflow()
         return self.sessions[session_id]
-    
     def cleanup_session(self, session_id: str):
-        """세션을 정리합니다."""
         if session_id in self.sessions:
             del self.sessions[session_id]
 
-# 전역 매니저 인스턴스
 workflow_manager = WorkflowManager()
 
 class TariffPredictionWorkflow:
@@ -524,17 +519,16 @@ class TariffPredictionWorkflow:
 
 
 def tariff_prediction_agent(state: CustomsAgentState) -> CustomsAgentState:
-    session_id = DEFAULT_SESSION_ID 
-    
-    workflow = workflow_manager.get_session(session_id)
-    
+    session_id = state.get("session_id")
+    if session_id:
+        workflow = workflow_manager.get_session(session_id)
+    else:
+        workflow = None
     messages = state.get("messages", [])
     context = ""
     previous_llm_responses = []
-    
     if messages:
         recent_messages = messages[-10:]
-        
         user_messages = []
         for msg in recent_messages:
             if hasattr(msg, 'type'):
@@ -545,19 +539,19 @@ def tariff_prediction_agent(state: CustomsAgentState) -> CustomsAgentState:
                         content = msg.content
                         if any(keyword in content for keyword in ['HS6 코드 후보', 'HS10 코드 후보', '번호를 선택']):
                             previous_llm_responses.append(content)
-        
         if user_messages:
-            context = " ".join(user_messages[-5:]) 
-    
+            context = " ".join(user_messages[-5:])
     enhanced_context = context or ""
     if previous_llm_responses:
         enhanced_context += f"\n\n{RESPONSE_MESSAGES['previous_llm_response']}\n" + "\n".join(previous_llm_responses[-2:])
-    
-    if enhanced_context:
-        enhanced_query = f"{enhanced_context}\n\n{state['query']}"
-        response = workflow.process_user_input(enhanced_query)
+    if workflow:
+        if enhanced_context:
+            enhanced_query = f"{enhanced_context}\n\n{state['query']}"
+            response = workflow.process_user_input(enhanced_query)
+        else:
+            response = workflow.process_user_input(state["query"])
     else:
-        response = workflow.process_user_input(state["query"])
-    
+        response = ERROR_MESSAGES.get('session_error', '세션이 유효하지 않습니다.')
     state["final_response"] = response
+    state["session_id"] = session_id
     return state

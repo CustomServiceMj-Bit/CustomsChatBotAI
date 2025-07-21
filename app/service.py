@@ -1,17 +1,18 @@
 from app.dto.response import Response
 from core.graphs.runner import run_customs_agent
 
-def run_model(question: str) -> "Response":
+def run_model(question: str, session_id: str = None) -> "Response":
     """
         중앙 관리 모델을 통해 각 요청을 적절한 모델로 라우팅
         아무 모델과도 관계없는 경우 중앙 모델에서 적절한 응답을 생성해야 합니다.
         ex : "안녕, 너는 뭘 할 수 있어?"
         예시 코드는 아래와 같습니다.
     """
-    state = run_customs_agent(question)
+    state = run_customs_agent(question, session_id=session_id)
     return Response(
         reply=state.get("final_response"),
         progress_details=state.get("progress_details"),
         error_reason=state.get("error_reason"),
-        success=True
+        success=True,
+        session_id=state.get("session_id")
     )

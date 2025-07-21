@@ -4,7 +4,7 @@ from core.graphs.workflow import create_customs_graph
 from core.shared.states.states import CustomsAgentState
 
 
-def run_customs_agent(query: str) -> CustomsAgentState:
+def run_customs_agent(query: str, session_id: str = None) -> CustomsAgentState:
     """관세청 에이전트를 실행합니다."""
     
     # 그래프 생성
@@ -18,7 +18,8 @@ def run_customs_agent(query: str) -> CustomsAgentState:
         final_response="",
         intermediate_results={},
         error_reason=None,
-        progress_details=None
+        progress_details=None,
+        session_id=session_id
     )
     
     # 그래프 실행
