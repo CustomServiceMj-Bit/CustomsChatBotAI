@@ -107,8 +107,6 @@ def intent_router(state: CustomsAgentState) -> CustomsAgentState:
     if is_in_tariff_session:
         state["intent"] = "tariff_prediction"
         _add_classification_message(state, "tariff_prediction", "관세 예측 세션 연속성 유지")
-        if not state.get("session_id") or state.get("session_id") in [None, '']:
-            state["session_id"] = str(uuid.uuid4())
         return state
     # 패턴 기반 분류
     is_number_selection = _is_number_selection(current_query)
@@ -117,49 +115,36 @@ def intent_router(state: CustomsAgentState) -> CustomsAgentState:
     if is_question:
         state["intent"] = "qna"
         _add_classification_message(state, "qna", "질문 형태 감지(우선)")
-        if prev_intent == "tariff_prediction" and state.get("session_id"):
+        if prev_intent == "tariff_prediction":
             try:
                 from core.tariff_prediction.agent.tariff_prediction_agent import workflow_manager
                 workflow_manager.cleanup_session(state["session_id"])
             except Exception:
                 pass
-        state["session_id"] = None
         return state
     # 키워드 기반 분류
     keyword_intent = _classify_by_keywords(current_query)
     if keyword_intent:
         state["intent"] = keyword_intent
         _add_classification_message(state, keyword_intent, "키워드 기반 분류")
-        if prev_intent == "tariff_prediction" and keyword_intent != "tariff_prediction" and state.get("session_id"):
+        if prev_intent == "tariff_prediction" and keyword_intent != "tariff_prediction":
             try:
                 from core.tariff_prediction.agent.tariff_prediction_agent import workflow_manager
                 workflow_manager.cleanup_session(state["session_id"])
             except Exception:
                 pass
-        if keyword_intent == "tariff_prediction":
-            if not state.get("session_id") or state.get("session_id") in [None, '']:
-                state["session_id"] = str(uuid.uuid4())
-        else:
-            state["session_id"] = None
         return state
     if is_number_selection:
         state["intent"] = "tariff_prediction"
         _add_classification_message(state, "tariff_prediction", "숫자 선택 감지")
-        if not state.get("session_id") or state.get("session_id") in [None, '']:
-            state["session_id"] = str(uuid.uuid4())
         return state
     intent = _classify_with_llm(current_query)
     state["intent"] = intent
     _add_classification_message(state, intent, "LLM 분류")
-    if prev_intent == "tariff_prediction" and intent != "tariff_prediction" and state.get("session_id"):
+    if prev_intent == "tariff_prediction" and intent != "tariff_prediction":
         try:
             from core.tariff_prediction.agent.tariff_prediction_agent import workflow_manager
             workflow_manager.cleanup_session(state["session_id"])
         except Exception:
             pass
-    if intent == "tariff_prediction":
-        if not state.get("session_id") or state.get("session_id") in [None, '']:
-            state["session_id"] = str(uuid.uuid4())
-    else:
-        state["session_id"] = None
     return state
