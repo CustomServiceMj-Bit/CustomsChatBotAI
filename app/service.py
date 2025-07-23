@@ -29,6 +29,5 @@ def run_model(question: str, session_id: str = None) -> "Response":
         reply=ai_reply,
         progress_details=state.get("progress_details"),
         error_reason=state.get("error_reason"),
-        success=True,
-        session_id=session_id  # session_id를 응답에 포함
+        success=True
     )

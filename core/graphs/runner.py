@@ -22,8 +22,7 @@ def run_customs_agent(query: str, session_id: str = None, messages=None) -> Cust
         final_response="",
         intermediate_results={},
         error_reason=None,
-        progress_details=None,
-        session_id=session_id
+        progress_details=None
     )
     
     # 그래프 실행

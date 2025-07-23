@@ -118,7 +118,7 @@ def intent_router(state: CustomsAgentState) -> CustomsAgentState:
         if prev_intent == "tariff_prediction":
             try:
                 from core.tariff_prediction.agent.tariff_prediction_agent import workflow_manager
-                workflow_manager.cleanup_session(state["session_id"])
+                workflow_manager.cleanup_session()
             except Exception:
                 pass
         return state
@@ -130,7 +130,7 @@ def intent_router(state: CustomsAgentState) -> CustomsAgentState:
         if prev_intent == "tariff_prediction" and keyword_intent != "tariff_prediction":
             try:
                 from core.tariff_prediction.agent.tariff_prediction_agent import workflow_manager
-                workflow_manager.cleanup_session(state["session_id"])
+                workflow_manager.cleanup_session()
             except Exception:
                 pass
         return state
@@ -144,7 +144,7 @@ def intent_router(state: CustomsAgentState) -> CustomsAgentState:
     if prev_intent == "tariff_prediction" and intent != "tariff_prediction":
         try:
             from core.tariff_prediction.agent.tariff_prediction_agent import workflow_manager
-            workflow_manager.cleanup_session(state["session_id"])
+            workflow_manager.cleanup_session()
         except Exception:
             pass
     return state

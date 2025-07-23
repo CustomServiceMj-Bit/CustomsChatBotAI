@@ -3,11 +3,8 @@ from core.shared.states.states import CustomsAgentState
 from core.tariff_prediction.constants import RESPONSE_MESSAGES
 
 def get_or_create_workflow(state: CustomsAgentState) -> TariffPredictionWorkflow:
-    session_id = state.get("session_id")
-    if session_id:
-        return workflow_manager.get_session(session_id)
-    else:
-        return TariffPredictionWorkflow()  # 임시 워크플로우로 단발성 처리
+    # session_id는 더 이상 사용하지 않음
+    return TariffPredictionWorkflow()  # 임시 워크플로우로 단발성 처리
 
 def extract_context_from_messages(messages: list) -> str:
     context = ""
@@ -40,5 +37,4 @@ def run_workflow_with_context(workflow: TariffPredictionWorkflow, state: Customs
 
 def build_response_state(state: CustomsAgentState, response: str) -> CustomsAgentState:
     state["final_response"] = response
-    # session_id는 외부에서 관리하므로 그대로 둠
     return state 
