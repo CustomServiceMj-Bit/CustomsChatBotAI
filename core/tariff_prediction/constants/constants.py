@@ -75,6 +75,24 @@ DEFAULT_QUANTITY = 1
 DEFAULT_SHIPPING_COST = 0
 DEFAULT_SESSION_ID = "default_session"
 
+# 입력 예시 상수
+INPUT_EXAMPLES = {
+    'basic': [
+        "미국에서 150만원에 노트북을 샀어요",
+        "일본에서 10만원짜리 이어폰을 구매했어요", 
+        "독일에서 80만원에 운동화 2켤레를 샀어요"
+    ],
+    'detailed': [
+        "인텔 i7 노트북을 150만원에 미국에서 구매했어요"
+    ],
+    'scenario': [
+        "1번", "해외직구", "여행 중에 샀어요"
+    ],
+    'selection': [
+        "1번", "2번", "3번"
+    ]
+}
+
 # 안내 메시지 상수
 GUIDE_MESSAGES = {
     'input_format': "💡 **다음과 같이 입력해 주세요:**",
@@ -82,7 +100,8 @@ GUIDE_MESSAGES = {
     'enter_number': "💡 **번호를 입력해 주세요.**",
     'wrong_number': "**잘못된 번호입니다.**",
     'number_range': "1부터 {max} 사이의 번호를 다시 입력해 주세요.",
-    'number_example': "예시: \"1번\", \"2번\", \"3번\" 등"
+    'number_example': "예시: \"1번\", \"2번\", \"3번\" 등",
+    'reprediction_hint': "만약 후보가 모두 적합하지 않으면 '코드가 없다', '다시', '재예측' 등으로 입력해 주세요."
 }
 
 # 오류 메시지 상수
@@ -193,6 +212,7 @@ RESPONSE_MESSAGES = {
     # HS10 선택 관련
     'hs10_no_reprediction': "💡 **번호를 입력해 주세요.** (예: 1, 2, 3)",
     
+    # 추가 누락된 키들
     'hs10_reprediction_not_available': "💡 **번호를 입력해 주세요.** (예: 1, 2, 3)",
     'off_topic_warning': "현재 관세 계산을 진행 중입니다. 계속 진행하시겠습니까, 아니면 중단하시겠습니까?\n\n계속하려면 '계속'을, 중단하려면 '중단'을 입력해 주세요.",
     'unrecognized_state': "죄송합니다. 현재 상태를 인식할 수 없습니다. 처음부터 다시 시작하겠습니다.",
@@ -229,9 +249,7 @@ RESPONSE_MESSAGES = {
     'tariff_note_1': "위 금액은 예상 관세이며, 실제 관세는 세관 심사 결과에 따라 달라질 수 있습니다.",
     'tariff_note_2': "정확한 관세는 통관 시 세관에서 최종 결정됩니다.",
     'tariff_note_3': "추가 문의사항이 있으시면 언제든 말씀해 주세요!",
-    'previous_llm_response': "이전 LLM 응답:",
-    'number_example': '예시: "1번", "2번", "3번" 등',
-    'reprediction_guide': '만약 모든 후보가 적합하지 않다면 “다시 예측해줘”라고 입력해 주세요.'
+    'previous_llm_response': "이전 LLM 응답:"
 }
 
 # 상태 관련 상수
