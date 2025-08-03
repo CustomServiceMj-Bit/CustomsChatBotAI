@@ -1,8 +1,7 @@
-from flask import Blueprint, request, jsonify, make_response
+from flask import Blueprint, request, jsonify
 from app.dto.request import Request
 from flasgger import swag_from
 from .service import run_model
-import uuid
 
 api_blueprint = Blueprint("api", __name__)
 
@@ -20,11 +19,6 @@ api_blueprint = Blueprint("api", __name__)
                     'question': {
                         'type': 'string',
                         'example': '이 물건의 세금이 얼마나 나올까?'
-                    },
-                    'session_id': {
-                        'type': 'string',
-                        'example': 'uuid-1234',
-                        'required': False
                     }
                 },
                 'required': ['question']
@@ -48,8 +42,5 @@ api_blueprint = Blueprint("api", __name__)
 })
 def predict():
     request_data = Request(**request.get_json())
-    session_id = request_data.session_id or request.cookies.get("session_id")
-    answer = run_model(question=request_data.message, session_id=session_id)
-    answer_dict = answer.model_dump()
-    response = make_response(jsonify(answer_dict))
-    return response
+    answer = run_model(question=request_data.message)
+    return jsonify(answer.model_dump())
